@@ -47,9 +47,14 @@ describe LargeObjectStore do
     store.read("a").size.should == 10_000_000
   end
 
-  it "passes options" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).twice
+  it "passes options when caching small" do
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111)
     store.write("a", "a", :expires_in => 111)
+  end
+
+  it "passes options when caching big" do
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).exactly(3).times
+    store.write("a", "a"*1_200_000, :expires_in => 111)
   end
 
   it "cannot read corrupted objects" do
@@ -76,6 +81,11 @@ describe LargeObjectStore do
   it "uses necessary keys" do
     store.write("a", "a"*5_000_000)
     store.store.keys.should == ["a_0", "a_1", "a_2", "a_3", "a_4", "a_5"]
+  end
+
+  it "uses 1 key when value is small enough" do
+    store.write("a", "a"*500_000)
+    store.store.keys.should == ["a_0"]
   end
 
   it "uses read_multi" do

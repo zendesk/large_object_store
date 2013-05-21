@@ -20,18 +20,22 @@ module LargeObjectStore
       
       # store number of pages
       pages = (value.size / LIMIT.to_f).ceil
-      @store.write("#{key}_0", pages, options)
 
-      # store object
-      page = 1
-      loop do
-        slice = value.slice!(0, LIMIT)
-        break if slice.size == 0
+      if pages == 1
+        @store.write("#{key}_0", value, options)
+      else
+        @store.write("#{key}_0", pages, options)
 
-        @store.write("#{key}_#{page}", slice, options)
-        page += 1
+        # store object
+        page = 1
+        loop do
+          slice = value.slice!(0, LIMIT)
+          break if slice.size == 0
+
+          @store.write("#{key}_#{page}", slice, options)
+          page += 1
+        end
       end
-
       true
     end
 
@@ -40,11 +44,16 @@ module LargeObjectStore
       pages = @store.read("#{key}_0")
       return if pages.nil?
 
-      # read sliced data
-      keys = Array.new(pages).each_with_index.map{|_,i| "#{key}_#{i+1}" }
-      slices = @store.read_multi(*keys).values
-      return nil if slices.compact.size < pages
-      Marshal.load(slices.join(""))
+      data = if pages.is_a?(String)
+        pages
+      else
+        # read sliced data
+        keys = Array.new(pages).each_with_index.map{|_,i| "#{key}_#{i+1}" }
+        slices = @store.read_multi(*keys).values
+        return nil if slices.compact.size < pages
+        slices.join("")
+      end
+      Marshal.load(data)
     end
 
     def fetch(key, options={})

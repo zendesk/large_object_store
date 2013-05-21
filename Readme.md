@@ -1,6 +1,7 @@
 Store large objects in memcache or others by slicing them.
  - uses read_multi for fast access
  - returns nil if one slice is missing
+ - only uses single read/write if data is below 1MB
 
 Install
 =======
