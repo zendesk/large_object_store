@@ -17,7 +17,7 @@ module LargeObjectStore
 
     def write(key, value, options = {})
       value = Marshal.dump(value)
-      
+
       # store number of pages
       pages = (value.size / LIMIT.to_f).ceil
 
@@ -62,6 +62,10 @@ module LargeObjectStore
       value = yield
       write(key, value, options)
       value
+    end
+
+    def delete(key)
+      @store.delete("#{key}_0")
     end
   end
 end

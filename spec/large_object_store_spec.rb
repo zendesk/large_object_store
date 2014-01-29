@@ -29,10 +29,15 @@ class TestCache
   def keys
     @data.keys
   end
+
+  def delete(key)
+    @data.delete(key)
+  end
 end
 
 describe LargeObjectStore do
-  let(:store) { LargeObjectStore.wrap(TestCache.new) }
+  let(:cache) { TestCache.new }
+  let(:store) { LargeObjectStore.wrap(cache) }
 
   it "has a VERSION" do
     LargeObjectStore::VERSION.should =~ /^[\.\da-z]+$/
@@ -112,6 +117,15 @@ describe LargeObjectStore do
     it "can fetch false" do
       store.fetch("a"){ false }.should == false
       store.read("a").should == false
+    end
+  end
+
+  describe "#delete" do
+    it "removes all keys" do
+      store.write("a", "a"*5_000_000)
+      store.read("a").should_not == nil
+      store.delete("a")
+      store.read("a").should == nil
     end
   end
 end
