@@ -38,7 +38,7 @@ end
 describe LargeObjectStore do
   let(:cache) { TestCache.new }
   let(:store) { LargeObjectStore.wrap(cache) }
-  let(:version) { LargeObjectStore::RailsWrapper::CACHE_VERSION }
+  let(:version) { LargeObjectStore::CACHE_VERSION }
 
   it "has a VERSION" do
     LargeObjectStore::VERSION.should =~ /^[\.\da-z]+$/
@@ -60,13 +60,13 @@ describe LargeObjectStore do
 
   it "passes options when caching big" do
     store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times.and_return(true)
-    store.store.should_receive(:write).with("a_#{version}_0", 2, :expires_in => 111).exactly(1).times.and_return(true)
+    store.store.should_receive(:write).with("a_#{version}_0", [2, anything], :expires_in => 111).exactly(1).times.and_return(true)
     store.write("a", "a"*1_200_000, :expires_in => 111)
   end
 
   it "returns false when underlying write fails" do
-    store.store.should_receive(:write).with(anything, anything, :raw => true).exactly(2).times.and_return(true)
-    store.store.should_receive(:write).with("a_#{version}_0", 2, {}).exactly(1).times.and_return(false)
+    store.store.should_not_receive(:write).with(anything, anything, :raw => true)
+    store.store.should_receive(:write).with("a_#{version}_0", [2, anything], {}).exactly(1).times.and_return(false)
     store.write("a", "a"*1_200_000).should == false
   end
 
@@ -79,10 +79,16 @@ describe LargeObjectStore do
     store.read("a").should == [1, 2, 3]
   end
 
-  it "cannot read corrupted objects" do
+  it "cannot read incomplete objects" do
     store.write("a", ["a"*10_000_000]).should == true
-    store.store.write("a_#{version}_4", nil)
+    store.store.delete("a_#{version}_4")
     store.read("a").nil?.should == true
+  end
+
+  it "cannot read corrupted keys from parallel processes" do
+    store.write("a", "a"*5_000_000)
+    store.store.write("a_#{version}_3", 'xxx', raw: true)
+    store.read("a").to_s.size.should == 0
   end
 
   it "can write/read big non-string objects" do
@@ -117,9 +123,9 @@ describe LargeObjectStore do
   it "can read/write giant compressed objects" do
     s = SecureRandom.hex(5_000_000)
     store.write("a", s, :compress => true).should == true
-    store.store.read("a_#{version}_0").should_not == ["a_0"]
-    store.store.read("a_#{version}_1").should start_with "x" # zlib magic
-    store.read("a").should == s
+    store.store.read("a_#{version}_0").first.should == 6
+    store.store.read("a_#{version}_1")[32..100].should start_with "x" # zlib magic
+    store.read("a").size.should == s.size
   end
 
   it "adjusts slice size for key length" do
@@ -143,7 +149,8 @@ describe LargeObjectStore do
 
   it "uses read_multi" do
     store.write("a", "a"*5_000_000)
-    store.store.should_receive(:read).with("a_#{version}_0").and_return 5
+    expected = store.store.read("a_#{version}_0")
+    store.store.should_receive(:read).with("a_#{version}_0").and_return expected
     store.read("a").size.should == 5_000_000
   end
 
