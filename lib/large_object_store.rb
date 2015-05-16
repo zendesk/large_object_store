@@ -9,6 +9,7 @@ module LargeObjectStore
 
   class RailsWrapper
     attr_reader :store
+    CACHE_VERSION = 2
 
     MAX_OBJECT_SIZE = 1024**2
     ITEM_HEADER_SIZE = 100
@@ -29,7 +30,7 @@ module LargeObjectStore
       pages = (value.size / slice_size.to_f).ceil
 
       if pages == 1
-        @store.write("#{key}_0", value, options)
+        @store.write(key(key, 0), value, options)
       else
         # store object
         page = 1
@@ -37,22 +38,22 @@ module LargeObjectStore
           slice = value.slice!(0, slice_size)
           break if slice.size == 0
 
-          return false unless @store.write("#{key}_#{page}", slice, options.merge(raw: true))
+          return false unless @store.write(key(key, page), slice, options.merge(raw: true))
           page += 1
         end
 
-        @store.write("#{key}_0", pages, options)
+        @store.write(key(key, 0), pages, options)
       end
     end
 
     def read(key)
       # read pages
-      pages = @store.read("#{key}_0")
+      pages = @store.read(key(key, 0))
       return if pages.nil?
 
       data = if pages.is_a?(Fixnum)
-        # read sliced data
-        keys = Array.new(pages).each_with_index.map{|_,i| "#{key}_#{i+1}" }
+        # read sliced data, making sure to allocate as little memory as possible
+        keys = Array.new(pages).each_with_index.map{|_,i| key(key, i+1) }
         slices = @store.read_multi(*keys).values
         return nil if slices.compact.size < pages
         slices.join("")
@@ -66,9 +67,9 @@ module LargeObjectStore
 
       begin
         Marshal.load(data)
-      rescue Exception => e
-        Rails.logger.error "Cannot read large_object_store key #{key} : #{e.message} #{e.backtrace.inspect}"
-        nil
+      # rescue Exception => e
+      #   Rails.logger.error "Cannot read large_object_store key #{key} : #{e.message} #{e.backtrace.inspect}"
+      #   nil
       end
     end
 
@@ -81,7 +82,13 @@ module LargeObjectStore
     end
 
     def delete(key)
-      @store.delete("#{key}_0")
+      @store.delete(key(key, 0))
+    end
+
+    private
+
+    def key(key, i)
+      "#{key}_#{CACHE_VERSION}_#{i}"
     end
   end
 end
