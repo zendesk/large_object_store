@@ -1,4 +1,5 @@
 require "large_object_store/version"
+require "zlib"
 
 module LargeObjectStore
 
@@ -17,6 +18,7 @@ module LargeObjectStore
 
     def write(key, value, options = {})
       value = Marshal.dump(value)
+      value = Zlib::Deflate.deflate(value) if options.delete(:compress)
 
       # store number of pages
       pages = (value.size / LIMIT.to_f).ceil
@@ -53,6 +55,11 @@ module LargeObjectStore
         return nil if slices.compact.size < pages
         slices.join("")
       end
+
+      if data.getbyte(0) == 0x78 && [0x01,0x9C,0xDA].include?(data.getbyte(1))
+        data = Zlib::Inflate.inflate(data)
+      end
+
       Marshal.load(data)
     end
 

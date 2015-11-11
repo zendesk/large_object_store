@@ -83,6 +83,21 @@ describe LargeObjectStore do
     store.read("a").size.should == 100_000_000
   end
 
+  it "can read/write compressed objects" do
+    s = "compress me"
+    store.write("a", s, :compress => true).should == true
+    store.store.read("a_0").should == Zlib::Deflate.deflate(Marshal.dump(s))
+    store.read("a").should == s
+  end
+
+  it "can read/write giant compressed objects" do
+    s = SecureRandom.hex(5_000_000)
+    store.write("a", s, :compress => true).should == true
+    store.store.read("a_0").should_not == ["a_0"]
+    store.store.read("a_1").should start_with "x" # zlib magic
+    store.read("a").should == s
+  end
+
   it "uses necessary keys" do
     store.write("a", "a"*5_000_000)
     store.store.keys.should == ["a_0", "a_1", "a_2", "a_3", "a_4", "a_5"]
