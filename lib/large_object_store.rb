@@ -8,6 +8,7 @@ module LargeObjectStore
   CACHE_VERSION = 2
   MAX_OBJECT_SIZE = 1024**2
   ITEM_HEADER_SIZE = 100
+  DEFAULT_COMPRESS_LIMIT = 16384
 
   def self.wrap(store)
     RailsWrapper.new(store)
@@ -22,7 +23,18 @@ module LargeObjectStore
 
     def write(key, value, options = {})
       value = Marshal.dump(value)
-      value = Zlib::Deflate.deflate(value) if options.delete(:compress)
+
+      options = options.dup
+      compressed = false
+      if options.delete(:compress)
+        # Don't pass compression on to Rails, we're doing it ourselves.
+        compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
+        if value.bytesize > compress_limit
+          value = Zlib::Deflate.deflate(value)
+          compressed = true
+        end
+      end
+      value.prepend(compressed ? 'z' : '0')
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
@@ -44,7 +56,7 @@ module LargeObjectStore
           slice = value.slice!(0, slice_size)
           break if slice.size == 0
 
-          return false unless @store.write(key(key, page),  slice.prepend(uuid), options.merge(raw: true))
+          return false unless @store.write(key(key, page), slice.prepend(uuid), options.merge(raw: true))
           page += 1
         end
         true
@@ -68,8 +80,13 @@ module LargeObjectStore
         pages
       end
 
-      if data.getbyte(0) == 0x78 && [0x01,0x9C,0xDA].include?(data.getbyte(1))
-        data = Zlib::Inflate.inflate(data)
+      if data[0] == 'z'
+        data = Zlib::Inflate.inflate(data[1..-1])
+      elsif data[0] == '0'
+        data = data[1..-1]
+      else
+        Rails.logger.error "Corrupt large_object_store key #{key}"
+        return nil
       end
 
       Marshal.load(data)

@@ -35,6 +35,18 @@ class TestCache
   end
 end
 
+RSpec::Matchers.define :be_compressed do
+  match do |actual|
+    actual[LargeObjectStore::UUID_SIZE] == 'z' || actual[0] == 'z'
+  end
+end
+
+RSpec::Matchers.define :be_uncompressed do
+  match do |actual|
+    actual[LargeObjectStore::UUID_SIZE] == '0' || actual[0] == '0'
+  end
+end
+
 describe LargeObjectStore do
   let(:cache) { TestCache.new }
   let(:store) { LargeObjectStore.wrap(cache) }
@@ -104,27 +116,51 @@ describe LargeObjectStore do
   it "can write/read giant objects" do
     store.write("a", "a"*100_000_000).should == true
     store.read("a").size.should == 100_000_000
+    store.store.read("a_#{version}_1").should be_uncompressed
   end
 
-  it "can read/write compressed objects" do
+  it "does not compress small objects" do
     s = "compress me"
     store.write("a", s, :compress => true).should == true
-    store.store.read("a_#{version}_0").should == Zlib::Deflate.deflate(Marshal.dump(s))
     store.read("a").should == s
+    store.store.read("a_#{version}_0").should be_uncompressed
   end
 
   it "can read/write compressed non-string objects" do
-    s = ["compress me"]
+    s = ["x"] * 10000
     store.write("a", s, :compress => true).should == true
-    store.store.read("a_#{version}_0").should == Zlib::Deflate.deflate(Marshal.dump(s))
     store.read("a").should == s
+    store.store.read("a_#{version}_0").should be_compressed
+  end
+
+  it "compresses large objects" do
+    s = "x" * 25000
+    store.write("a", s, :compress => true).should == true
+    store.read("a").should == s
+    store.store.read("a_#{version}_0").should be_compressed
+  end
+
+  it "compresses objects larger than optional compress_limit" do
+    s = "compress me"
+    len = s.length
+    store.write("a", s, :compress => true, :compress_limit => len-1).should == true
+    store.read("a").should == s
+    store.store.read("a_#{version}_0").should be_compressed
+  end
+
+  it "does not compress objects smaller than optional compress limit" do
+    s = "don't compress me"
+    len = s.length
+    store.write("a", s, :compress => true, :compress_limit => len*2).should == true
+    store.read("a").should == s
+    store.store.read("a_#{version}_0").should be_uncompressed
   end
 
   it "can read/write giant compressed objects" do
     s = SecureRandom.hex(5_000_000)
     store.write("a", s, :compress => true).should == true
     store.store.read("a_#{version}_0").first.should == 6
-    store.store.read("a_#{version}_1")[32..100].should start_with "x" # zlib magic
+    store.store.read("a_#{version}_1").should be_compressed
     store.read("a").size.should == s.size
   end
 
