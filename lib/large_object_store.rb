@@ -38,7 +38,7 @@ module LargeObjectStore
       pages = (value.size / slice_size.to_f).ceil
 
       if pages == 1
-        @store.write(key(key, 0), value, options)
+        !!@store.write(key(key, 0), value, options)
       else
         # store meta
         uuid = SecureRandom.hex(UUID_BYTES)

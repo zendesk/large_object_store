@@ -7,3 +7,4 @@ rvm:
   - 2.2.3
 matrix:
   fast_finish: true
+services: memcached
