@@ -53,14 +53,20 @@ describe LargeObjectStore do
   end
 
   it "passes options when caching small" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true)
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).and_return(true)
     store.write("a", "a", :expires_in => 111)
   end
 
   it "passes options when caching big" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).exactly(1).times
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times.and_return(true)
+    store.store.should_receive(:write).with("a_0", 2, :expires_in => 111).exactly(1).times.and_return(true)
     store.write("a", "a"*1_200_000, :expires_in => 111)
+  end
+
+  it "returns false when underlying write fails" do
+    store.store.should_receive(:write).with(anything, anything, :raw => true).exactly(2).times.and_return(true)
+    store.store.should_receive(:write).with("a_0", 2, {}).exactly(1).times.and_return(false)
+    store.write("a", "a"*1_200_000).should == false
   end
 
   it "reads back small objects of various types as they were written" do
@@ -119,7 +125,7 @@ describe LargeObjectStore do
 
   it "uses necessary keys" do
     store.write("a", "a"*5_000_000)
-    store.store.keys.should == ["a_0", "a_1", "a_2", "a_3", "a_4", "a_5"]
+    store.store.keys.sort.should == ["a_0", "a_1", "a_2", "a_3", "a_4", "a_5"]
   end
 
   it "uses 1 key when value is small enough" do
