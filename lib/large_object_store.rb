@@ -23,13 +23,13 @@ module LargeObjectStore
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
-      slice_size = MAX_OBJECT_SIZE - ITEM_HEADER_SIZE - key.length
+      slice_size = MAX_OBJECT_SIZE - ITEM_HEADER_SIZE - key.bytesize
 
       # store number of pages
       pages = (value.size / slice_size.to_f).ceil
 
       if pages == 1
-        return false unless @store.write("#{key}_0", value, options.merge(raw: true))
+        @store.write("#{key}_0", value, options.merge(raw: true))
       else
         # store object
         page = 1
@@ -41,9 +41,8 @@ module LargeObjectStore
           page += 1
         end
 
-        return false unless @store.write("#{key}_0", pages, options)
+        @store.write("#{key}_0", pages, options)
       end
-      true
     end
 
     def read(key)
