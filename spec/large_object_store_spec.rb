@@ -53,7 +53,7 @@ describe LargeObjectStore do
   end
 
   it "passes options when caching small" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).and_return(true)
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).and_return(true)
     store.write("a", "a", :expires_in => 111)
   end
 

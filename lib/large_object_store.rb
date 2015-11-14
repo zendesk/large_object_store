@@ -29,7 +29,7 @@ module LargeObjectStore
       pages = (value.size / slice_size.to_f).ceil
 
       if pages == 1
-        @store.write("#{key}_0", value, options.merge(raw: true))
+        @store.write("#{key}_0", value, options)
       else
         # store object
         page = 1
