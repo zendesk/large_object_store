@@ -53,13 +53,23 @@ describe LargeObjectStore do
   end
 
   it "passes options when caching small" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111)
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true)
     store.write("a", "a", :expires_in => 111)
   end
 
   it "passes options when caching big" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).exactly(3).times
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).exactly(1).times
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times
     store.write("a", "a"*1_200_000, :expires_in => 111)
+  end
+
+  it "reads back small objects of various types as they were written" do
+    store.write("a", "hello")
+    store.read("a").should == "hello"
+    store.write("a", 123)
+    store.read("a").should == 123
+    store.write("a", [1, 2, 3])
+    store.read("a").should == [1, 2, 3]
   end
 
   it "cannot read corrupted objects" do
@@ -96,6 +106,15 @@ describe LargeObjectStore do
     store.store.read("a_0").should_not == ["a_0"]
     store.store.read("a_1").should start_with "x" # zlib magic
     store.read("a").should == s
+  end
+
+  it "adjusts slice size for key length" do
+    store.write("a", "a"*100_000_000).should == true
+    store.store.read("a_1").size.should == 1048576 - 100 - 1
+
+    key="a"*250
+    store.write(key, "a"*100_000_000).should == true
+    store.store.read("#{key}_1").size.should == 1048576 - 100 - 250
   end
 
   it "uses necessary keys" do

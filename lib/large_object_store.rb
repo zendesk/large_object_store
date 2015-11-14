@@ -10,7 +10,8 @@ module LargeObjectStore
   class RailsWrapper
     attr_reader :store
 
-    LIMIT = 1024**2 - 100
+    MAX_OBJECT_SIZE = 1024**2
+    ITEM_HEADER_SIZE = 100
 
     def initialize(store)
       @store = store
@@ -20,21 +21,25 @@ module LargeObjectStore
       value = Marshal.dump(value)
       value = Zlib::Deflate.deflate(value) if options.delete(:compress)
 
+      # calculate slice size; note that key length is a factor because
+      # the key is stored on the same slab page as the value
+      slice_size = MAX_OBJECT_SIZE - ITEM_HEADER_SIZE - key.length
+
       # store number of pages
-      pages = (value.size / LIMIT.to_f).ceil
+      pages = (value.size / slice_size.to_f).ceil
 
       if pages == 1
-        @store.write("#{key}_0", value, options)
+        @store.write("#{key}_0", value, options.merge(raw: true))
       else
         @store.write("#{key}_0", pages, options)
 
         # store object
         page = 1
         loop do
-          slice = value.slice!(0, LIMIT)
+          slice = value.slice!(0, slice_size)
           break if slice.size == 0
 
-          @store.write("#{key}_#{page}", slice, options)
+          @store.write("#{key}_#{page}", slice, options.merge(raw: true))
           page += 1
         end
       end
