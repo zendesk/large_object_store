@@ -50,21 +50,26 @@ module LargeObjectStore
       pages = @store.read("#{key}_0")
       return if pages.nil?
 
-      data = if pages.is_a?(String)
-        pages
-      else
+      data = if pages.is_a?(Fixnum)
         # read sliced data
         keys = Array.new(pages).each_with_index.map{|_,i| "#{key}_#{i+1}" }
         slices = @store.read_multi(*keys).values
         return nil if slices.compact.size < pages
         slices.join("")
+      else
+        pages
       end
 
       if data.getbyte(0) == 0x78 && [0x01,0x9C,0xDA].include?(data.getbyte(1))
         data = Zlib::Inflate.inflate(data)
       end
 
-      Marshal.load(data)
+      begin
+        Marshal.load(data)
+      rescue Exception => e
+        Rails.logger.error "Cannot read large_object_store key #{key} : #{e.message} #{e.backtrace.inspect}"
+        nil
+      end
     end
 
     def fetch(key, options={})
