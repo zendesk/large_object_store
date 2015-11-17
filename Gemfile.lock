@@ -1,7 +1,6 @@
 PATH
   remote: .
   specs:
-    large_object_store (1.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -26,3 +25,6 @@ DEPENDENCIES
   large_object_store!
   rake
   rspec (~> 2)
+
+BUNDLED WITH
+   1.10.6
