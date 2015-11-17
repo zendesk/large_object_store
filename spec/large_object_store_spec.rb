@@ -53,13 +53,29 @@ describe LargeObjectStore do
   end
 
   it "passes options when caching small" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111)
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).and_return(true)
     store.write("a", "a", :expires_in => 111)
   end
 
   it "passes options when caching big" do
-    store.store.should_receive(:write).with(anything, anything, :expires_in => 111).exactly(3).times
+    store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times.and_return(true)
+    store.store.should_receive(:write).with("a_0", 2, :expires_in => 111).exactly(1).times.and_return(true)
     store.write("a", "a"*1_200_000, :expires_in => 111)
+  end
+
+  it "returns false when underlying write fails" do
+    store.store.should_receive(:write).with(anything, anything, :raw => true).exactly(2).times.and_return(true)
+    store.store.should_receive(:write).with("a_0", 2, {}).exactly(1).times.and_return(false)
+    store.write("a", "a"*1_200_000).should == false
+  end
+
+  it "reads back small objects of various types as they were written" do
+    store.write("a", "hello")
+    store.read("a").should == "hello"
+    store.write("a", 123)
+    store.read("a").should == 123
+    store.write("a", [1, 2, 3])
+    store.read("a").should == [1, 2, 3]
   end
 
   it "cannot read corrupted objects" do
@@ -98,9 +114,18 @@ describe LargeObjectStore do
     store.read("a").should == s
   end
 
+  it "adjusts slice size for key length" do
+    store.write("a", "a"*100_000_000).should == true
+    store.store.read("a_1").size.should == 1048576 - 100 - 1
+
+    key="a"*250
+    store.write(key, "a"*100_000_000).should == true
+    store.store.read("#{key}_1").size.should == 1048576 - 100 - 250
+  end
+
   it "uses necessary keys" do
     store.write("a", "a"*5_000_000)
-    store.store.keys.should == ["a_0", "a_1", "a_2", "a_3", "a_4", "a_5"]
+    store.store.keys.sort.should == ["a_0", "a_1", "a_2", "a_3", "a_4", "a_5"]
   end
 
   it "uses 1 key when value is small enough" do
