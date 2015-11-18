@@ -35,6 +35,7 @@ class TestCache
   end
 end
 
+# compression indicator is in first position for single page values and after the uuid for multi page values
 RSpec::Matchers.define :be_compressed do
   match do |actual|
     actual[LargeObjectStore::UUID_SIZE] == LargeObjectStore::COMPRESSED || actual[0] == LargeObjectStore::COMPRESSED
