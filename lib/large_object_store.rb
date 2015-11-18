@@ -9,6 +9,8 @@ module LargeObjectStore
   MAX_OBJECT_SIZE = 1024**2
   ITEM_HEADER_SIZE = 100
   DEFAULT_COMPRESS_LIMIT = 16*1024
+  COMPRESSED = 'z'
+  NORMAL = '0'
 
   def self.wrap(store)
     RailsWrapper.new(store)
@@ -34,7 +36,7 @@ module LargeObjectStore
           compressed = true
         end
       end
-      value.prepend(compressed ? 'z' : '0')
+      value.prepend(compressed ? COMPRESSED : NORMAL)
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
@@ -80,13 +82,8 @@ module LargeObjectStore
         pages
       end
 
-      if data[0] == 'z'
-        data = Zlib::Inflate.inflate(data[1..-1])
-      elsif data[0] == '0'
-        data = data[1..-1]
-      else
-        Rails.logger.error "Corrupt large_object_store key #{key}"
-        return nil
+      if data.slice!(0, 1) == COMPRESSED
+        data = Zlib::Inflate.inflate(data)
       end
 
       Marshal.load(data)

@@ -37,13 +37,13 @@ end
 
 RSpec::Matchers.define :be_compressed do
   match do |actual|
-    actual[LargeObjectStore::UUID_SIZE] == 'z' || actual[0] == 'z'
+    actual[LargeObjectStore::UUID_SIZE] == LargeObjectStore::COMPRESSED || actual[0] == LargeObjectStore::COMPRESSED
   end
 end
 
 RSpec::Matchers.define :be_uncompressed do
   match do |actual|
-    actual[LargeObjectStore::UUID_SIZE] == '0' || actual[0] == '0'
+    actual[LargeObjectStore::UUID_SIZE] == LargeObjectStore::NORMAL || actual[0] == LargeObjectStore::NORMAL
   end
 end
 
