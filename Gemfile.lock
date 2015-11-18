@@ -1,6 +1,7 @@
 PATH
   remote: .
   specs:
+    large_object_store (1.2.0)
 
 GEM
   remote: https://rubygems.org/
