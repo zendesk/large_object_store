@@ -8,7 +8,7 @@ module LargeObjectStore
   CACHE_VERSION = 2
   MAX_OBJECT_SIZE = 1024**2
   ITEM_HEADER_SIZE = 100
-  DEFAULT_COMPRESS_LIMIT = 16384
+  DEFAULT_COMPRESS_LIMIT = 16*1024
 
   def self.wrap(store)
     RailsWrapper.new(store)
