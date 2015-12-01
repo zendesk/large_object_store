@@ -1,7 +1,7 @@
 Store large objects in memcache or others by slicing them.
  - uses read_multi for fast access
  - returns nil if one slice is missing
- - only uses single read/write if data is below 1MB
+ - low performance overhead, only uses single read/write if data is below 1MB
 
 Install
 =======
@@ -21,6 +21,9 @@ store.write("a", "a"*10_000_000)  # => true -> always!
 store.read("a").size              # => 10_000_000 using multi_get
 store.read("b")                   # => nil
 store.fetch("a"){ "something" }   # => "something" executes block on miss
+store.write("a" * 10_000_000, compress: true)                # compress when greater than 16k
+store.write("a" * 1000, compress: true, compress_limit: 100) # compress when greater than 100
+store.write("a" * 1000, raw: true)                           # store as string to avoid marshaling overhead
 ```
 
 Author
