@@ -27,15 +27,7 @@ module LargeObjectStore
       value = Marshal.dump(value)
 
       options = options.dup
-      compressed = false
-      if options.delete(:compress)
-        # Don't pass compression on to Rails, we're doing it ourselves.
-        compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
-        if value.bytesize > compress_limit
-          value = Zlib::Deflate.deflate(value)
-          compressed = true
-        end
-      end
+      value, compressed = compress(value, options)
       value.prepend(compressed ? COMPRESSED : NORMAL)
 
       # calculate slice size; note that key length is a factor because
@@ -102,6 +94,17 @@ module LargeObjectStore
     end
 
     private
+
+    def compress(value, options)
+      if options.delete(:compress)
+        # Don't pass compression on to Rails, we're doing it ourselves.
+        compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
+        if value.bytesize > compress_limit
+          return Zlib::Deflate.deflate(value), true
+        end
+      end
+      return value, false
+    end
 
     def key(key, i)
       "#{key}_#{CACHE_VERSION}_#{i}"
