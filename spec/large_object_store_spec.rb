@@ -120,49 +120,51 @@ describe LargeObjectStore do
     store.store.read("a_#{version}_1").should be_uncompressed
   end
 
-  it "does not compress small objects" do
-    s = "compress me"
-    store.write("a", s, :compress => true).should == true
-    store.read("a").should == s
-    store.store.read("a_#{version}_0").should be_uncompressed
-  end
+  describe "compression" do
+    it "does not compress small objects" do
+      s = "compress me"
+      store.write("a", s, :compress => true).should == true
+      store.read("a").should == s
+      store.store.read("a_#{version}_0").should be_uncompressed
+    end
 
-  it "can read/write compressed non-string objects" do
-    s = ["x"] * 10000
-    store.write("a", s, :compress => true).should == true
-    store.read("a").should == s
-    store.store.read("a_#{version}_0").should be_compressed
-  end
+    it "can read/write compressed non-string objects" do
+      s = ["x"] * 10000
+      store.write("a", s, :compress => true).should == true
+      store.read("a").should == s
+      store.store.read("a_#{version}_0").should be_compressed
+    end
 
-  it "compresses large objects" do
-    s = "x" * 25000
-    store.write("a", s, :compress => true).should == true
-    store.read("a").should == s
-    store.store.read("a_#{version}_0").should be_compressed
-  end
+    it "compresses large objects" do
+      s = "x" * 25000
+      store.write("a", s, :compress => true).should == true
+      store.read("a").should == s
+      store.store.read("a_#{version}_0").should be_compressed
+    end
 
-  it "compresses objects larger than optional compress_limit" do
-    s = "compress me"
-    len = s.length
-    store.write("a", s, :compress => true, :compress_limit => len-1).should == true
-    store.read("a").should == s
-    store.store.read("a_#{version}_0").should be_compressed
-  end
+    it "compresses objects larger than optional compress_limit" do
+      s = "compress me"
+      len = s.length
+      store.write("a", s, :compress => true, :compress_limit => len-1).should == true
+      store.read("a").should == s
+      store.store.read("a_#{version}_0").should be_compressed
+    end
 
-  it "does not compress objects smaller than optional compress limit" do
-    s = "don't compress me"
-    len = s.length
-    store.write("a", s, :compress => true, :compress_limit => len*2).should == true
-    store.read("a").should == s
-    store.store.read("a_#{version}_0").should be_uncompressed
-  end
+    it "does not compress objects smaller than optional compress limit" do
+      s = "don't compress me"
+      len = s.length
+      store.write("a", s, :compress => true, :compress_limit => len*2).should == true
+      store.read("a").should == s
+      store.store.read("a_#{version}_0").should be_uncompressed
+      end
 
-  it "can read/write giant compressed objects" do
+    it "can read/write giant compressed objects" do
     s = SecureRandom.hex(5_000_000)
     store.write("a", s, :compress => true).should == true
     store.store.read("a_#{version}_0").first.should == 6
     store.store.read("a_#{version}_1").should be_compressed
     store.read("a").size.should == s.size
+    end
   end
 
   it "adjusts slice size for key length" do
