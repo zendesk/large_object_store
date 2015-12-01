@@ -1,39 +1,7 @@
 # encoding: utf-8
 require "spec_helper"
-
-class TestCache
-  def initialize
-    @data = {}
-  end
-
-  def write(k,v, options={})
-    v = Marshal.dump(v)
-    return false if v.bytesize > 1024**2
-    @data[k] = v
-    true
-  end
-
-  def read(k)
-    real_read(k)
-  end
-
-  def real_read(k)
-    v = @data[k]
-    v.nil? ? nil : Marshal.load(v)
-  end
-
-  def read_multi(*keys)
-    Hash[keys.map{|k| [k, real_read(k)] }]
-  end
-
-  def keys
-    @data.keys
-  end
-
-  def delete(key)
-    @data.delete(key)
-  end
-end
+require "active_support/cache"
+require "active_support/cache/dalli_store"
 
 # compression indicator is in first position for single page values and after the uuid for multi page values
 RSpec::Matchers.define :be_compressed do
@@ -49,9 +17,11 @@ RSpec::Matchers.define :be_uncompressed do
 end
 
 describe LargeObjectStore do
-  let(:cache) { TestCache.new }
+  let(:cache) { ActiveSupport::Cache::DalliStore.new "localhost:11211" }
   let(:store) { LargeObjectStore.wrap(cache) }
   let(:version) { LargeObjectStore::CACHE_VERSION }
+
+  before { cache.clear }
 
   it "has a VERSION" do
     LargeObjectStore::VERSION.should =~ /^[\.\da-z]+$/
@@ -115,8 +85,9 @@ describe LargeObjectStore do
   end
 
   it "can write/read giant objects" do
-    store.write("a", "a"*100_000_000).should == true
-    store.read("a").size.should == 100_000_000
+    size = 20_000_000 # more then that seems to break local memcached ...
+    store.write("a", "a"*size).should == true
+    store.read("a").size.should == size
     store.store.read("a_#{version}_1").should be_uncompressed
   end
 
@@ -168,22 +139,26 @@ describe LargeObjectStore do
   end
 
   it "adjusts slice size for key length" do
-    store.write("a", "a"*100_000_000).should == true
+    store.write("a", "a"*20_000_000).should == true
     store.store.read("a_#{version}_1").size.should == 1048576 - 100 - 1
 
     key="a"*250
-    store.write(key, "a"*100_000_000).should == true
+    store.write(key, "a"*20_000_000).should == true
     store.store.read("#{key}_#{version}_1").size.should == 1048576 - 100 - 250
   end
 
   it "uses necessary keys" do
     store.write("a", "a"*5_000_000)
-    store.store.keys.should =~ ["a_#{version}_0", "a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5"]
+    ["a_#{version}_0", "a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5", "a_#{version}_6"].map do |k|
+      store.store.read(k).class
+    end.should == [Array, String, String, String, String, String, NilClass]
   end
 
   it "uses 1 key when value is small enough" do
     store.write("a", "a"*500_000)
-    store.store.keys.should == ["a_#{version}_0"]
+    ["a_#{version}_0", "a_#{version}_1"].map do |k|
+      store.store.read(k).class
+    end.should == [String, NilClass]
   end
 
   it "uses read_multi" do
