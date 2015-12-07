@@ -3,20 +3,24 @@ require "spec_helper"
 require "active_support/cache"
 require "active_support/cache/dalli_store"
 
-# compression indicator is in first position for single page values and after the uuid for multi page values
-RSpec::Matchers.define :be_compressed do
-  match do |actual|
-    actual[LargeObjectStore::UUID_SIZE] == LargeObjectStore::COMPRESSED || actual[0] == LargeObjectStore::COMPRESSED
-  end
-end
-
-RSpec::Matchers.define :be_uncompressed do
-  match do |actual|
-    actual[LargeObjectStore::UUID_SIZE] == LargeObjectStore::NORMAL || actual[0] == LargeObjectStore::NORMAL
-  end
-end
-
 describe LargeObjectStore do
+  # flag is in first position for single page values and after the uuid for multi page values
+  def type(data, kind)
+    type = case kind
+    when :single then data[0]
+    when :multi then data[LargeObjectStore::UUID_SIZE]
+    else raise "Unknown kind #{kind}"
+    end
+
+    case type
+    when '0' then :normal
+    when '1' then :compressed
+    when '2' then :raw
+    when '3' then :raw_compressed
+    else :unknown
+    end
+  end
+
   let(:cache) { ActiveSupport::Cache::DalliStore.new "localhost:11211" }
   let(:store) { LargeObjectStore.wrap(cache) }
   let(:version) { LargeObjectStore::CACHE_VERSION }
@@ -88,7 +92,32 @@ describe LargeObjectStore do
     size = 20_000_000 # more then that seems to break local memcached ...
     store.write("a", "a"*size).should == true
     store.read("a").size.should == size
-    store.store.read("a_#{version}_1").should be_uncompressed
+    type(store.store.read("a_#{version}_1"), :multi).should == :normal
+  end
+
+  describe "raw" do
+    it "stores non-raw as raw" do
+      store.write("a", 1, raw: true).should == true
+      store.read("a").should == "1"
+    end
+
+    it "can read and write small objects with raw" do
+      store.write("a", "a", raw: true).should == true
+      store.read("a").size.should == 1
+      store.store.read("a_#{version}_0").size.should == 2
+    end
+
+    it "can read and write large objects with raw" do
+      store.write("a", "a"*10_000_000, raw: true).should == true
+      store.read("a").size.should == 10_000_000
+      type(store.store.read("a_#{version}_1"), :multi).should == :raw
+    end
+
+    it "can read and write compressed raw" do
+      store.write("a", "a", raw: true, compress: true, compress_limit: 0).should == true
+      store.read("a").should == "a"
+      type(store.store.read("a_#{version}_0"), :single).should == :raw_compressed
+    end
   end
 
   describe "compression" do
@@ -96,21 +125,21 @@ describe LargeObjectStore do
       s = "compress me"
       store.write("a", s, :compress => true).should == true
       store.read("a").should == s
-      store.store.read("a_#{version}_0").should be_uncompressed
+      type(store.store.read("a_#{version}_0"), :single).should == :normal
     end
 
     it "can read/write compressed non-string objects" do
       s = ["x"] * 10000
       store.write("a", s, :compress => true).should == true
       store.read("a").should == s
-      store.store.read("a_#{version}_0").should be_compressed
+      type(store.store.read("a_#{version}_0"), :single).should == :compressed
     end
 
     it "compresses large objects" do
       s = "x" * 25000
       store.write("a", s, :compress => true).should == true
       store.read("a").should == s
-      store.store.read("a_#{version}_0").should be_compressed
+      type(store.store.read("a_#{version}_0"), :single).should == :compressed
     end
 
     it "compresses objects larger than optional compress_limit" do
@@ -118,7 +147,7 @@ describe LargeObjectStore do
       len = s.length
       store.write("a", s, :compress => true, :compress_limit => len-1).should == true
       store.read("a").should == s
-      store.store.read("a_#{version}_0").should be_compressed
+      type(store.store.read("a_#{version}_0"), :single).should == :compressed
     end
 
     it "does not compress objects smaller than optional compress limit" do
@@ -126,15 +155,15 @@ describe LargeObjectStore do
       len = s.length
       store.write("a", s, :compress => true, :compress_limit => len*2).should == true
       store.read("a").should == s
-      store.store.read("a_#{version}_0").should be_uncompressed
-      end
+      type(store.store.read("a_#{version}_0"), :single).should == :normal
+    end
 
     it "can read/write giant compressed objects" do
-    s = SecureRandom.hex(5_000_000)
-    store.write("a", s, :compress => true).should == true
-    store.store.read("a_#{version}_0").first.should == 6
-    store.store.read("a_#{version}_1").should be_compressed
-    store.read("a").size.should == s.size
+      s = SecureRandom.hex(5_000_000)
+      store.write("a", s, :compress => true).should == true
+      store.store.read("a_#{version}_0").first.should == 6
+      type(store.store.read("a_#{version}_1"), :multi).should == :compressed
+      store.read("a").size.should == s.size
     end
   end
 

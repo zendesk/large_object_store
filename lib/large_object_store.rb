@@ -5,12 +5,14 @@ require "securerandom"
 module LargeObjectStore
   UUID_BYTES = 16
   UUID_SIZE = UUID_BYTES * 2
-  CACHE_VERSION = 2
+  CACHE_VERSION = 3
   MAX_OBJECT_SIZE = 1024**2
   ITEM_HEADER_SIZE = 100
   DEFAULT_COMPRESS_LIMIT = 16*1024
-  COMPRESSED = 'z'
-  NORMAL = '0'
+  NORMAL = 0
+  COMPRESSED = 1
+  RAW = 2
+  RADIX = 32 # we can store 32 different states
 
   def self.wrap(store)
     RailsWrapper.new(store)
@@ -24,11 +26,8 @@ module LargeObjectStore
     end
 
     def write(key, value, options = {})
-      value = Marshal.dump(value)
-
       options = options.dup
-      value, compressed = compress(value, options)
-      value.prepend(compressed ? COMPRESSED : NORMAL)
+      value = serialize(value, options)
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
@@ -74,11 +73,7 @@ module LargeObjectStore
         pages
       end
 
-      if data.slice!(0, 1) == COMPRESSED
-        data = Zlib::Inflate.inflate(data)
-      end
-
-      Marshal.load(data)
+      deserialize(data)
     end
 
     def fetch(key, options={})
@@ -95,15 +90,39 @@ module LargeObjectStore
 
     private
 
-    def compress(value, options)
-      if options.delete(:compress)
-        # Don't pass compression on to Rails, we're doing it ourselves.
-        compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
-        if value.bytesize > compress_limit
-          return Zlib::Deflate.deflate(value), true
-        end
+    # convert a object to a string
+    # modifies options
+    def serialize(value, options)
+      flag = NORMAL
+
+      if options.delete(:raw)
+        flag |= RAW
+        value = value.to_s
+      else
+        value = Marshal.dump(value)
       end
-      return value, false
+
+      if compress?(value, options)
+        flag |= COMPRESSED
+        value = Zlib::Deflate.deflate(value)
+      end
+
+      value.prepend(flag.to_s(RADIX))
+    end
+
+    # opposite operations and order of serialize
+    def deserialize(data)
+      flag = data.slice!(0, 1).to_i(RADIX)
+      data = Zlib::Inflate.inflate(data) if flag & COMPRESSED == COMPRESSED
+      data = Marshal.load(data) if flag & RAW != RAW
+      data
+    end
+
+    # Don't pass compression on to Rails, we're doing it ourselves.
+    def compress?(value, options)
+      return unless options.delete(:compress)
+      compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
+      value.bytesize > compress_limit
     end
 
     def key(key, i)
