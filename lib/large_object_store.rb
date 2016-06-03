@@ -63,8 +63,9 @@ module LargeObjectStore
 
       data = if pages.is_a?(Fixnum)
         # read sliced data
-        keys = Array.new(pages).each_with_index.map{|_,i| key(key, i+1) }
-        slices = @store.read_multi(*keys).values
+        keys = (1..pages).map { |i| key(key, i) }
+        # use values_at to enforce key order because read_multi doesn't guarantee a return order
+        slices = @store.read_multi(*keys).values_at(*keys)
         return nil if slices.compact.size != pages
         slices.map! { |s| [s.slice!(0, UUID_SIZE), s] }
         return nil unless slices.map(&:first).uniq == [uuid]

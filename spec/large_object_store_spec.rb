@@ -197,6 +197,16 @@ describe LargeObjectStore do
     store.read("a").size.should == 5_000_000
   end
 
+  it "handles read_multi returning results in any order" do
+    store.write("a", "c"*5_000_000) # don't use 'a' because it is a valid flag option
+    keys = ["a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5"]
+    out_of_order_hash = keys.reverse.each_with_object({}) do |k, h|
+      h[k] = store.store.read(k)
+    end
+    store.store.should_receive(:read_multi).and_return out_of_order_hash
+    store.read("a").size.should == 5_000_000
+  end
+
   describe "#fetch" do
     it "executes the block on miss" do
       store.fetch("a"){ 1 }.should == 1
