@@ -228,6 +228,18 @@ describe LargeObjectStore do
     end
   end
 
+  describe "#exist?" do
+    it "returns false if it isn't in the cache" do
+      cache.clear
+      store.exist?("a").should == false
+    end
+
+    it "returns true if the 0th key is in the cache" do
+      store.write("b", "foo")
+      store.exist?("b").should == true
+    end
+  end
+
   describe "#delete" do
     it "removes all keys" do
       store.write("a", "a"*5_000_000)

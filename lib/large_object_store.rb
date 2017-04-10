@@ -85,6 +85,10 @@ module LargeObjectStore
       value
     end
 
+    def exist?(key)
+      @store.exist?(key(key, 0))
+    end
+
     def delete(key)
       @store.delete(key(key, 0))
     end
