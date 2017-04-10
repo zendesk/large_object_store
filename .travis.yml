@@ -1,6 +1,8 @@
 cache: bundler
 sudo: false
 language: ruby
+branches:
+  only: master
 rvm:
   - 1.9.3
   - 2.1.7
