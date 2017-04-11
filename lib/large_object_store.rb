@@ -12,7 +12,7 @@ module LargeObjectStore
   NORMAL = 0
   COMPRESSED = 1
   RAW = 2
-  RADIX = 32 # we can store 32 different states
+  FLAG_RADIX = 32 # we can store 32 different states
 
   def self.wrap(store)
     RailsWrapper.new(store)
@@ -67,8 +67,14 @@ module LargeObjectStore
         # use values_at to enforce key order because read_multi doesn't guarantee a return order
         slices = @store.read_multi(*keys).values_at(*keys)
         return nil if slices.compact.size != pages
-        slices.map! { |s| [s.slice!(0, UUID_SIZE), s] }
+
+        slices = slices.map do |slice|
+          s = slice.dup
+          [s.slice!(0, UUID_SIZE), s]
+        end
+
         return nil unless slices.map(&:first).uniq == [uuid]
+
         slices.map!(&:last).join("")
       else
         pages
@@ -112,12 +118,13 @@ module LargeObjectStore
         value = Zlib::Deflate.deflate(value)
       end
 
-      value.prepend(flag.to_s(RADIX))
+      value.prepend(flag.to_s(FLAG_RADIX))
     end
 
     # opposite operations and order of serialize
-    def deserialize(data)
-      flag = data.slice!(0, 1).to_i(RADIX)
+    def deserialize(raw_data)
+      data = raw_data.dup
+      flag = data.slice!(0, 1).to_i(FLAG_RADIX)
       data = Zlib::Inflate.inflate(data) if flag & COMPRESSED == COMPRESSED
       data = Marshal.load(data) if flag & RAW != RAW
       data
