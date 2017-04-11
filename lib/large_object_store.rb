@@ -67,9 +67,9 @@ module LargeObjectStore
         # use values_at to enforce key order because read_multi doesn't guarantee a return order
         slices = @store.read_multi(*keys).values_at(*keys)
         return nil if slices.compact.size != pages
-        slices.map! { |s| [s.slice!(0, UUID_SIZE), s] }
+        slices = slices.map { |s| [s[0...UUID_SIZE], s[UUID_SIZE..-1]] }
         return nil unless slices.map(&:first).uniq == [uuid]
-        slices.map!(&:last).join("")
+        slices.map(&:last).join("")
       else
         pages
       end
@@ -117,7 +117,7 @@ module LargeObjectStore
 
     # opposite operations and order of serialize
     def deserialize(data)
-      flag = data.slice!(0, 1).to_i(RADIX)
+      flag, data = data[0].to_i(RADIX), data[1..-1]
       data = Zlib::Inflate.inflate(data) if flag & COMPRESSED == COMPRESSED
       data = Marshal.load(data) if flag & RAW != RAW
       data
