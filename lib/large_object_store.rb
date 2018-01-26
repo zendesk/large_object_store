@@ -61,7 +61,7 @@ module LargeObjectStore
       pages, uuid = @store.read(key(key, 0))
       return if pages.nil?
 
-      data = if pages.is_a?(Fixnum)
+      data = if pages.is_a?(Integer)
         # read sliced data
         keys = (1..pages).map { |i| key(key, i) }
         # use values_at to enforce key order because read_multi doesn't guarantee a return order
