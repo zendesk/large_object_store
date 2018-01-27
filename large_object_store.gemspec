@@ -8,4 +8,5 @@ Gem::Specification.new name, LargeObjectStore::VERSION do |s|
   s.homepage = "https://github.com/anamartinez/#{name}"
   s.files = `git ls-files lib Readme.md`.split("\n")
   s.license = "MIT"
+  s.required_ruby_version = '>= 2.0'
 end
