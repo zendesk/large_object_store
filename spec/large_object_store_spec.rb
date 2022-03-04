@@ -1,6 +1,7 @@
 # encoding: utf-8
 require "spec_helper"
 require "active_support/cache"
+require "active_support/notifications"
 require "active_support/cache/dalli_store"
 
 describe LargeObjectStore do
@@ -21,7 +22,10 @@ describe LargeObjectStore do
     end
   end
 
-  [ActiveSupport::Cache::MemoryStore.new, ActiveSupport::Cache::DalliStore.new("localhost:11211")].each do |cache_instance|
+  [
+    ActiveSupport::Cache::MemoryStore.new,
+    ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
+  ].each do |cache_instance|
     describe "with #{cache_instance.class} as the base store" do
       let(:cache) { cache_instance }
       let(:store) { LargeObjectStore.wrap(cache) }

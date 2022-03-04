@@ -33,4 +33,4 @@ acemacu@gmail.com<br/>
 [Michael Grosser](https://github.com/grosser)<br/>
 michael@grosser.it<br/>
 License: MIT<br/>
-[![Build Status](https://travis-ci.org/anamartinez/large_object_store.png)](https://travis-ci.org/anamartinez/large_object_store)
+[![CI](https://github.com/anamartinez/large_object_store/actions/workflows/actions.yml/badge.svg)](https://github.com/anamartinez/large_object_store/actions/workflows/actions.yml)
