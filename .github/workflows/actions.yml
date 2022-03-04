@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      memcached:
+        image: memcached:latest
+        ports: ["11211/tcp"]
+    strategy:
+      matrix:
+        ruby: ['2.5', '2.6', '2.7']
+    name: ${{ matrix.ruby }} rake
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+        bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+    - run: bundle exec rake MEMCACHED_PORT=${{ job.services.memcached.ports[11211] }}
