@@ -3,6 +3,7 @@ require "spec_helper"
 require "active_support/cache"
 require "active_support/notifications"
 require "active_support/cache/dalli_store"
+require "oj"
 
 describe LargeObjectStore do
   # flag is in first position for single page values and after the uuid for multi page values
@@ -258,6 +259,19 @@ describe LargeObjectStore do
           store.read("a").nil?.should == false
           store.delete("a")
           store.read("a").nil?.should == true
+        end
+      end
+
+      describe "when a custom serializer is specified" do
+        let(:store) { LargeObjectStore.wrap(cache, serializer: Oj) }
+
+        it "uses the custom serializer" do
+          value = { "foo" => "bar" }
+          json = Oj.dump(value)
+          Oj.should_receive(:dump).with(value).and_call_original
+          store.fetch("a") { value }
+          Oj.should_receive(:load).with(json).and_call_original
+          store.read("a").should == value
         end
       end
     end

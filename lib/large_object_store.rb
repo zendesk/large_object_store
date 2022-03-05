@@ -14,15 +14,16 @@ module LargeObjectStore
   RAW = 2
   FLAG_RADIX = 32 # we can store 32 different states
 
-  def self.wrap(store)
-    RailsWrapper.new(store)
+  def self.wrap(store, **options)
+    RailsWrapper.new(store, options)
   end
 
   class RailsWrapper
     attr_reader :store
 
-    def initialize(store)
+    def initialize(store, serializer: Marshal)
       @store = store
+      @serializer = serializer
     end
 
     def write(key, value, options = {})
@@ -110,7 +111,7 @@ module LargeObjectStore
         flag |= RAW
         value = value.to_s
       else
-        value = Marshal.dump(value)
+        value = @serializer.dump(value)
       end
 
       if compress?(value, options)
@@ -126,7 +127,7 @@ module LargeObjectStore
       data = raw_data.dup
       flag = data.slice!(0, 1).to_i(FLAG_RADIX)
       data = Zlib::Inflate.inflate(data) if flag & COMPRESSED == COMPRESSED
-      data = Marshal.load(data) if flag & RAW != RAW
+      data = @serializer.load(data) if flag & RAW != RAW
       data
     end
 
