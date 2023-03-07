@@ -2,7 +2,6 @@
 require "spec_helper"
 require "active_support/cache"
 require "active_support/notifications"
-require "active_support/cache/dalli_store"
 require "yaml"
 
 describe LargeObjectStore do
@@ -23,10 +22,16 @@ describe LargeObjectStore do
     end
   end
 
-  [
-    ActiveSupport::Cache::MemoryStore.new,
-    ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
-  ].each do |cache_instance|
+  stores = [ActiveSupport::Cache::MemoryStore.new]
+
+  begin
+    require "active_support/cache/dalli_store"
+    stores << ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
+  rescue LoadError
+    # No DalliStore in Dalli v3+
+  end
+
+  stores.each do |cache_instance|
     describe "with #{cache_instance.class} as the base store" do
       let(:cache) { cache_instance }
       let(:store) { LargeObjectStore.wrap(cache) }
@@ -55,7 +60,7 @@ describe LargeObjectStore do
       end
 
       it "passes options when caching small" do
-        expect(store.store).to receive(:write).with(anything, anything, :expires_in => 111).and_return(true)
+        expect(store.store).to receive(:write).with(anything, anything, { :expires_in => 111 }).and_return(true)
         store.write("a", "a", :expires_in => 111)
       end
 
@@ -67,7 +72,11 @@ describe LargeObjectStore do
 
       it "returns false when underlying write fails" do
         expect(store.store).not_to receive(:write).with(anything, anything, :raw => true)
-        expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything], {}).exactly(1).times.and_return(false)
+        if RUBY_VERSION < "3"
+          expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything], {}).exactly(1).times.and_return(false)
+        else
+          expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything]).exactly(1).times.and_return(false)
+        end
         expect(store.write("a", "a"*1_200_000)).to eq(false)
       end
 
