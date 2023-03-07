@@ -5,20 +5,39 @@ on:
   pull_request:
     branches: [master]
 jobs:
-  test:
+  specs:
     runs-on: ubuntu-latest
     services:
       memcached:
         image: memcached:latest
         ports: ["11211/tcp"]
     strategy:
+      fail-fast: false
       matrix:
-        ruby: ['2.5', '2.6', '2.7']
+        ruby:
+          - '2.5'
+          - '2.6'
+          - '2.7'
     name: ${{ matrix.ruby }} rake
     steps:
-    - uses: actions/checkout@v2
-    - uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby }}
-        bundler-cache: true # runs 'bundle install' and caches installed gems automatically
-    - run: bundle exec rake MEMCACHED_PORT=${{ job.services.memcached.ports[11211] }}
+      - uses: zendesk/checkout@v3
+      - uses: zendesk/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - run: bundle exec rake MEMCACHED_PORT=${{ job.services.memcached.ports[11211] }}
+
+  specs_successful:
+    name: Specs passing?
+    needs: specs
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if ${{ needs.specs.result == 'success' }}
+          then
+            echo "All specs pass"
+          else
+            echo "Some specs failed"
+            false
+          fi
