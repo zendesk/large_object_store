@@ -19,7 +19,6 @@ GEM
     i18n (1.12.0)
       concurrent-ruby (~> 1.0)
     minitest (5.15.0)
-    oj (3.14.2)
     rake (13.0.6)
     rspec (3.12.0)
       rspec-core (~> 3.12.0)
@@ -46,7 +45,6 @@ DEPENDENCIES
   bump
   dalli (< 3)
   large_object_store!
-  oj
   rake
   rspec (~> 3)
 

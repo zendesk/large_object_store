@@ -3,7 +3,7 @@ require "spec_helper"
 require "active_support/cache"
 require "active_support/notifications"
 require "active_support/cache/dalli_store"
-require "oj"
+require "yaml"
 
 describe LargeObjectStore do
   # flag is in first position for single page values and after the uuid for multi page values
@@ -263,14 +263,14 @@ describe LargeObjectStore do
       end
 
       describe "when a custom serializer is specified" do
-        let(:store) { LargeObjectStore.wrap(cache, serializer: Oj) }
+        let(:store) { LargeObjectStore.wrap(cache, serializer: YAML) }
 
         it "uses the custom serializer" do
           value = { "foo" => "bar" }
-          json = Oj.dump(value)
-          expect(Oj).to receive(:dump).with(value).and_call_original
+          json = YAML.dump(value)
+          expect(YAML).to receive(:dump).with(value).and_call_original
           store.fetch("a") { value }
-          expect(Oj).to receive(:load).with(json).and_call_original
+          expect(YAML).to receive(:load).with(json).and_call_original
           expect(store.read("a")).to eq(value)
         end
       end
