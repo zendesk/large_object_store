@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [master]
 jobs:
-  test:
+  specs:
     runs-on: ubuntu-latest
     services:
       memcached:
@@ -26,3 +26,18 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
       - run: bundle exec rake MEMCACHED_PORT=${{ job.services.memcached.ports[11211] }}
+
+  specs_successful:
+    name: Specs passing?
+    needs: specs
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if ${{ needs.specs.result == 'success' }}
+          then
+            echo "All specs pass"
+          else
+            echo "Some specs failed"
+            false
+          fi
