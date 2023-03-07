@@ -35,180 +35,180 @@ describe LargeObjectStore do
       before { cache.clear }
 
       it "has a VERSION" do
-        LargeObjectStore::VERSION.should =~ /^[\.\da-z]+$/
+        expect(LargeObjectStore::VERSION).to match(/^[\.\da-z]+$/)
       end
 
       it "wraps and returns a wrapper" do
-        store.class.should == LargeObjectStore::RailsWrapper
+        expect(store.class).to eq(LargeObjectStore::RailsWrapper)
       end
 
       it "can write/read big objects" do
-        store.write("a", "a"*10_000_000).should == true
-        store.read("a").size.should == 10_000_000
-        store.read("a").size.should == 10_000_000
+        expect(store.write("a", "a"*10_000_000)).to eq(true)
+        expect(store.read("a").size).to eq(10_000_000)
+        expect(store.read("a").size).to eq(10_000_000)
       end
 
       it "can write/read small objects" do
-        store.write("a", {}).should == true
-        store.read("a").should == {}
-        store.read("a").should == {}
+        expect(store.write("a", {})).to eq(true)
+        expect(store.read("a")).to eq({})
+        expect(store.read("a")).to eq({})
       end
 
       it "passes options when caching small" do
-        store.store.should_receive(:write).with(anything, anything, :expires_in => 111).and_return(true)
+        expect(store.store).to receive(:write).with(anything, anything, :expires_in => 111).and_return(true)
         store.write("a", "a", :expires_in => 111)
       end
 
       it "passes options when caching big" do
-        store.store.should_receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times.and_return(true)
-        store.store.should_receive(:write).with("a_#{version}_0", [2, anything], :expires_in => 111).exactly(1).times.and_return(true)
+        expect(store.store).to receive(:write).with(anything, anything, :expires_in => 111, :raw => true).exactly(2).times.and_return(true)
+        expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything], :expires_in => 111).exactly(1).times.and_return(true)
         store.write("a", "a"*1_200_000, :expires_in => 111)
       end
 
       it "returns false when underlying write fails" do
-        store.store.should_not_receive(:write).with(anything, anything, :raw => true)
-        store.store.should_receive(:write).with("a_#{version}_0", [2, anything], {}).exactly(1).times.and_return(false)
-        store.write("a", "a"*1_200_000).should == false
+        expect(store.store).not_to receive(:write).with(anything, anything, :raw => true)
+        expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything], {}).exactly(1).times.and_return(false)
+        expect(store.write("a", "a"*1_200_000)).to eq(false)
       end
 
       it "reads back small objects of various types as they were written" do
         store.write("a", "hello")
-        store.read("a").should == "hello"
+        expect(store.read("a")).to eq("hello")
         store.write("a", 123)
-        store.read("a").should == 123
+        expect(store.read("a")).to eq(123)
         store.write("a", [1, 2, 3])
-        store.read("a").should == [1, 2, 3]
+        expect(store.read("a")).to eq([1, 2, 3])
       end
 
       it "cannot read incomplete objects" do
-        store.write("a", ["a"*10_000_000]).should == true
+        expect(store.write("a", ["a"*10_000_000])).to eq(true)
         store.store.delete("a_#{version}_4")
-        store.read("a").nil?.should == true
+        expect(store.read("a").nil?).to eq(true)
       end
 
       it "cannot read corrupted keys from parallel processes" do
         store.write("a", "a"*5_000_000)
         store.store.write("a_#{version}_3", 'xxx', raw: true)
-        store.read("a").to_s.size.should == 0
+        expect(store.read("a").to_s.size).to eq(0)
       end
 
       it "can write/read big non-string objects" do
-        store.write("a", ["a"*10_000_000]).should == true
-        store.read("a").first.size.should == 10_000_000
+        expect(store.write("a", ["a"*10_000_000])).to eq(true)
+        expect(store.read("a").first.size).to eq(10_000_000)
       end
 
       it "can read/write objects with encoding" do
-        store.write("a", "ß"*10_000_000).should == true
-        store.read("a").size.should == 10_000_000
+        expect(store.write("a", "ß"*10_000_000)).to eq(true)
+        expect(store.read("a").size).to eq(10_000_000)
       end
 
       it "can write/read giant objects" do
         size = 20_000_000 # more then that seems to break local memcached ...
-        store.write("a", "a"*size).should == true
-        store.read("a").size.should == size
-        type(store.store.read("a_#{version}_1"), :multi).should == :normal
+        expect(store.write("a", "a"*size)).to eq(true)
+        expect(store.read("a").size).to eq(size)
+        expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:normal)
       end
 
       describe "raw" do
         it "stores non-raw as raw" do
-          store.write("a", 1, raw: true).should == true
-          store.read("a").should == "1"
+          expect(store.write("a", 1, raw: true)).to eq(true)
+          expect(store.read("a")).to eq("1")
         end
 
         it "can read and write small objects with raw" do
-          store.write("a", "a", raw: true).should == true
-          store.read("a").size.should == 1
-          store.store.read("a_#{version}_0").size.should == 2
+          expect(store.write("a", "a", raw: true)).to eq(true)
+          expect(store.read("a").size).to eq(1)
+          expect(store.store.read("a_#{version}_0").size).to eq(2)
         end
 
         it "can read and write large objects with raw" do
-          store.write("a", "a"*10_000_000, raw: true).should == true
-          store.read("a").size.should == 10_000_000
-          type(store.store.read("a_#{version}_1"), :multi).should == :raw
+          expect(store.write("a", "a"*10_000_000, raw: true)).to eq(true)
+          expect(store.read("a").size).to eq(10_000_000)
+          expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:raw)
         end
 
         it "can read and write compressed raw" do
-          store.write("a", "a", raw: true, compress: true, compress_limit: 0).should == true
-          store.read("a").should == "a"
-          type(store.store.read("a_#{version}_0"), :single).should == :raw_compressed
+          expect(store.write("a", "a", raw: true, compress: true, compress_limit: 0)).to eq(true)
+          expect(store.read("a")).to eq("a")
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:raw_compressed)
         end
       end
 
       describe "compression" do
         it "does not compress small objects" do
           s = "compress me"
-          store.write("a", s, :compress => true).should == true
-          store.read("a").should == s
-          type(store.store.read("a_#{version}_0"), :single).should == :normal
+          expect(store.write("a", s, :compress => true)).to eq(true)
+          expect(store.read("a")).to eq(s)
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:normal)
         end
 
         it "can read/write compressed non-string objects" do
           s = ["x"] * 10000
-          store.write("a", s, :compress => true).should == true
-          store.read("a").should == s
-          type(store.store.read("a_#{version}_0"), :single).should == :compressed
+          expect(store.write("a", s, :compress => true)).to eq(true)
+          expect(store.read("a")).to eq(s)
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
         end
 
         it "compresses large objects" do
           s = "x" * 25000
-          store.write("a", s, :compress => true).should == true
-          store.read("a").should == s
-          type(store.store.read("a_#{version}_0"), :single).should == :compressed
+          expect(store.write("a", s, :compress => true)).to eq(true)
+          expect(store.read("a")).to eq(s)
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
         end
 
         it "compresses objects larger than optional compress_limit" do
           s = "compress me"
           len = s.length
-          store.write("a", s, :compress => true, :compress_limit => len-1).should == true
-          store.read("a").should == s
-          type(store.store.read("a_#{version}_0"), :single).should == :compressed
+          expect(store.write("a", s, :compress => true, :compress_limit => len-1)).to eq(true)
+          expect(store.read("a")).to eq(s)
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
         end
 
         it "does not compress objects smaller than optional compress limit" do
           s = "don't compress me"
           len = s.length
-          store.write("a", s, :compress => true, :compress_limit => len*2).should == true
-          store.read("a").should == s
-          type(store.store.read("a_#{version}_0"), :single).should == :normal
+          expect(store.write("a", s, :compress => true, :compress_limit => len*2)).to eq(true)
+          expect(store.read("a")).to eq(s)
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:normal)
         end
 
         it "can read/write giant compressed objects" do
           s = SecureRandom.hex(5_000_000)
-          store.write("a", s, :compress => true).should == true
-          store.store.read("a_#{version}_0").first.should == 6
-          type(store.store.read("a_#{version}_1"), :multi).should == :compressed
-          store.read("a").size.should == s.size
+          expect(store.write("a", s, :compress => true)).to eq(true)
+          expect(store.store.read("a_#{version}_0").first).to eq(6)
+          expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:compressed)
+          expect(store.read("a").size).to eq(s.size)
         end
       end
 
       it "adjusts slice size for key length" do
-        store.write("a", "a"*20_000_000).should == true
-        store.store.read("a_#{version}_1").size.should == 1048576 - 100 - 1
+        expect(store.write("a", "a"*20_000_000)).to eq(true)
+        expect(store.store.read("a_#{version}_1").size).to eq(1048576 - 100 - 1)
 
         key="a"*250
-        store.write(key, "a"*20_000_000).should == true
-        store.store.read("#{key}_#{version}_1").size.should == 1048576 - 100 - 250
+        expect(store.write(key, "a"*20_000_000)).to eq(true)
+        expect(store.store.read("#{key}_#{version}_1").size).to eq(1048576 - 100 - 250)
       end
 
       it "uses necessary keys" do
         store.write("a", "a"*5_000_000)
-        ["a_#{version}_0", "a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5", "a_#{version}_6"].map do |k|
+        expect(["a_#{version}_0", "a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5", "a_#{version}_6"].map do |k|
           store.store.read(k).class
-        end.should == [Array, String, String, String, String, String, NilClass]
+        end).to eq([Array, String, String, String, String, String, NilClass])
       end
 
       it "uses 1 key when value is small enough" do
         store.write("a", "a"*500_000)
-        ["a_#{version}_0", "a_#{version}_1"].map do |k|
+        expect(["a_#{version}_0", "a_#{version}_1"].map do |k|
           store.store.read(k).class
-        end.should == [String, NilClass]
+        end).to eq([String, NilClass])
       end
 
       it "uses read_multi" do
         store.write("a", "a"*5_000_000)
         expected = store.store.read("a_#{version}_0")
-        store.store.should_receive(:read).with("a_#{version}_0").and_return expected
-        store.read("a").size.should == 5_000_000
+        expect(store.store).to receive(:read).with("a_#{version}_0").and_return expected
+        expect(store.read("a").size).to eq(5_000_000)
       end
 
       it "handles read_multi returning results in any order" do
@@ -217,48 +217,48 @@ describe LargeObjectStore do
         out_of_order_hash = keys.reverse.each_with_object({}) do |k, h|
           h[k] = store.store.read(k)
         end
-        store.store.should_receive(:read_multi).and_return out_of_order_hash
-        store.read("a").size.should == 5_000_000
+        expect(store.store).to receive(:read_multi).and_return out_of_order_hash
+        expect(store.read("a").size).to eq(5_000_000)
       end
 
       describe "#fetch" do
         it "executes the block on miss" do
-          store.fetch("a"){ 1 }.should == 1
+          expect(store.fetch("a"){ 1 }).to eq(1)
         end
 
         it "does not execute the block on hit" do
           store.fetch("a"){ 1 }
-          store.fetch("a"){ 2 }.should == 1
+          expect(store.fetch("a"){ 2 }).to eq(1)
         end
 
         it "passes the options" do
-          store.should_receive(:write).with(anything, anything, :expires_in => 111)
+          expect(store).to receive(:write).with(anything, anything, :expires_in => 111)
           store.fetch("a", :expires_in => 111){ 2 }
         end
 
         it "can fetch false" do
-          store.fetch("a"){ false }.should == false
-          store.read("a").should == false
+          expect(store.fetch("a"){ false }).to eq(false)
+          expect(store.read("a")).to eq(false)
         end
       end
 
       describe "#exist?" do
         it "returns false if it isn't in the cache" do
-          store.exist?("a").should == false
+          expect(store.exist?("a")).to eq(false)
         end
 
         it "returns true if the 0th key is in the cache" do
           store.write("b", "foo")
-          store.exist?("b").should == true
+          expect(store.exist?("b")).to eq(true)
         end
       end
 
       describe "#delete" do
         it "removes all keys" do
           store.write("a", "a"*5_000_000)
-          store.read("a").nil?.should == false
+          expect(store.read("a").nil?).to eq(false)
           store.delete("a")
-          store.read("a").nil?.should == true
+          expect(store.read("a").nil?).to eq(true)
         end
       end
 
@@ -268,10 +268,10 @@ describe LargeObjectStore do
         it "uses the custom serializer" do
           value = { "foo" => "bar" }
           json = Oj.dump(value)
-          Oj.should_receive(:dump).with(value).and_call_original
+          expect(Oj).to receive(:dump).with(value).and_call_original
           store.fetch("a") { value }
-          Oj.should_receive(:load).with(json).and_call_original
-          store.read("a").should == value
+          expect(Oj).to receive(:load).with(json).and_call_original
+          expect(store.read("a")).to eq(value)
         end
       end
     end
