@@ -14,8 +14,11 @@ module LargeObjectStore
   RAW = 2
   FLAG_RADIX = 32 # we can store 32 different states
 
-  def self.wrap(store, **options)
-    RailsWrapper.new(store, options)
+  def self.wrap(*args)
+    RailsWrapper.new(*args)
+  end
+  class << self
+    ruby2_keywords :wrap if respond_to?(:ruby2_keywords, true)
   end
 
   class RailsWrapper
@@ -26,9 +29,9 @@ module LargeObjectStore
       @serializer = serializer
     end
 
-    def write(key, value, options = {})
+    def write(key, value, **options)
       options = options.dup
-      value = serialize(value, options)
+      value = serialize(value, **options)
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
@@ -38,11 +41,11 @@ module LargeObjectStore
       pages = (value.size / slice_size.to_f).ceil
 
       if pages == 1
-        !!@store.write(key(key, 0), value, options)
+        !!@store.write(key(key, 0), value, **options)
       else
         # store meta
         uuid = SecureRandom.hex(UUID_BYTES)
-        return false unless @store.write(key(key, 0), [pages, uuid], options) # invalidates the old cache
+        return false unless @store.write(key(key, 0), [pages, uuid], **options) # invalidates the old cache
 
         # store object
         page = 1
@@ -50,7 +53,7 @@ module LargeObjectStore
           slice = value.slice!(0, slice_size)
           break if slice.size == 0
 
-          return false unless @store.write(key(key, page), slice.prepend(uuid), options.merge(raw: true))
+          return false unless @store.write(key(key, page), slice.prepend(uuid), raw: true, **options)
           page += 1
         end
         true
@@ -84,11 +87,11 @@ module LargeObjectStore
       deserialize(data)
     end
 
-    def fetch(key, options={})
+    def fetch(key, **options)
       value = read(key)
       return value unless value.nil?
       value = yield
-      write(key, value, options)
+      write(key, value, **options)
       value
     end
 
@@ -104,7 +107,7 @@ module LargeObjectStore
 
     # convert a object to a string
     # modifies options
-    def serialize(value, options)
+    def serialize(value, **options)
       flag = NORMAL
 
       if options.delete(:raw)
@@ -114,7 +117,7 @@ module LargeObjectStore
         value = @serializer.dump(value)
       end
 
-      if compress?(value, options)
+      if compress?(value, **options)
         flag |= COMPRESSED
         value = Zlib::Deflate.deflate(value)
       end
@@ -132,7 +135,7 @@ module LargeObjectStore
     end
 
     # Don't pass compression on to Rails, we're doing it ourselves.
-    def compress?(value, options)
+    def compress?(value, **options)
       return unless options.delete(:compress)
       compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
       value.bytesize > compress_limit
