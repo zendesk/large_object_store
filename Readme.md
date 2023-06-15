@@ -26,6 +26,19 @@ store.write("a" * 1000, compress: true, compress_limit: 100) # compress when gre
 store.write("a" * 1000, raw: true)                           # store as string to avoid marshaling overhead
 ```
 
+zstd
+====
+
+[zstd compression](https://engineering.fb.com/2016/08/31/core-data/smaller-and-faster-data-compression-with-zstandard/), a modern improvement over the venerable zlib compression algorithm, is supported by passing the `zstd` flag when writing items:
+
+```
+store.write("a" * 10_000_000, compress: true, zstd: true)
+```
+
+For backwards compatibility and to enable safe roll-out of the change in working systems, the `zstd` flag defaults to `false`.
+
+zstd decompression is used when the zstd magic number is detected at the beginning of compressed data, so `zstd: true` does not need to be passed when reading/fetching items.
+
 Author
 ======
 [Ana Martinez](https://github.com/anamartinez)<br/>

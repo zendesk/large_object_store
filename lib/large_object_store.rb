@@ -1,11 +1,12 @@
 require "large_object_store/version"
 require "zlib"
+require "zstd-ruby"
 require "securerandom"
 
 module LargeObjectStore
   UUID_BYTES = 16
   UUID_SIZE = UUID_BYTES * 2
-  CACHE_VERSION = 3
+  CACHE_VERSION = 4
   MAX_OBJECT_SIZE = 1024**2
   ITEM_HEADER_SIZE = 100
   DEFAULT_COMPRESS_LIMIT = 16*1024
@@ -13,6 +14,8 @@ module LargeObjectStore
   COMPRESSED = 1
   RAW = 2
   FLAG_RADIX = 32 # we can store 32 different states
+  ZSTD_MAGIC = "\x28\xB5\x2F\xFD".force_encoding('ASCII-8BIT')
+  ZSTD_COMPRESS_LEVEL = 3 # Default level recommended by zstd authors
 
   def self.wrap(*args)
     RailsWrapper.new(*args)
@@ -119,26 +122,51 @@ module LargeObjectStore
 
       if compress?(value, **options)
         flag |= COMPRESSED
-        value = Zlib::Deflate.deflate(value)
+        value = compress(value, options)
       end
 
       value.prepend(flag.to_s(FLAG_RADIX))
+    end
+
+    def compress(value, options)
+      if options[:zstd]
+        Zstd.compress(value, ZSTD_COMPRESS_LEVEL)
+      else
+        Zlib::Deflate.deflate(value)
+      end
+    end
+
+    def decompress(data)
+      if data.start_with?(ZSTD_MAGIC)
+        Zstd.decompress(data)
+      else
+        Zlib::Inflate.inflate(data)
+      end
     end
 
     # opposite operations and order of serialize
     def deserialize(raw_data)
       data = raw_data.dup
       flag = data.slice!(0, 1).to_i(FLAG_RADIX)
-      data = Zlib::Inflate.inflate(data) if flag & COMPRESSED == COMPRESSED
+      data = decompress(data) if flag & COMPRESSED == COMPRESSED
       data = @serializer.load(data) if flag & RAW != RAW
       data
     end
 
     # Don't pass compression on to Rails, we're doing it ourselves.
     def compress?(value, **options)
-      return unless options.delete(:compress)
-      compress_limit = options.delete(:compress_limit) || DEFAULT_COMPRESS_LIMIT
-      value.bytesize > compress_limit
+      return unless options[:compress]
+
+      compress_limit = options[:compress_limit] || DEFAULT_COMPRESS_LIMIT
+      should_compress = value.bytesize > compress_limit
+
+      if should_compress
+        # Pass compress: false to Rails in case the default is true
+        options[:compress] = false
+        options.delete(:compress_limit)
+      end
+
+      should_compress
     end
 
     def key(key, i)
