@@ -34,7 +34,7 @@ module LargeObjectStore
 
     def write(key, value, **options)
       options = options.dup
-      value = serialize(value, **options)
+      value = serialize(value, options)
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
@@ -110,7 +110,7 @@ module LargeObjectStore
 
     # convert a object to a string
     # modifies options
-    def serialize(value, **options)
+    def serialize(value, options)
       flag = NORMAL
 
       if options.delete(:raw)
@@ -120,7 +120,7 @@ module LargeObjectStore
         value = @serializer.dump(value)
       end
 
-      if compress?(value, **options)
+      if compress?(value, options)
         flag |= COMPRESSED
         value = compress(value, options)
       end
@@ -154,7 +154,7 @@ module LargeObjectStore
     end
 
     # Don't pass compression on to Rails, we're doing it ourselves.
-    def compress?(value, **options)
+    def compress?(value, options)
       return unless options[:compress]
 
       compress_limit = options[:compress_limit] || DEFAULT_COMPRESS_LIMIT
