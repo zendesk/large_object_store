@@ -141,6 +141,12 @@ describe LargeObjectStore do
           expect(store.read("a")).to eq("a")
           expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:raw_compressed)
         end
+
+        it "can read and write compressed zstd raw" do
+          expect(store.write("a", "a", raw: true, zstd: true, compress: true, compress_limit: 0)).to eq(true)
+          expect(store.read("a")).to eq("a")
+          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:raw_compressed)
+        end
       end
 
       describe "compression" do
@@ -151,42 +157,58 @@ describe LargeObjectStore do
           expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:normal)
         end
 
-        it "can read/write compressed non-string objects" do
-          s = ["x"] * 10000
-          expect(store.write("a", s, :compress => true)).to eq(true)
-          expect(store.read("a")).to eq(s)
-          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
-        end
+        [false, true].each do |zstd|
+          describe "with zstd=#{zstd}" do
+            before do
+              if zstd
+                # Zlib shouldn't be called
+                expect(Zlib::Deflate).not_to receive(:deflate)
+                expect(Zlib::Inflate).not_to receive(:inflate)
+              else
+                # Zstd shouldn't be called
+                expect(Zstd).not_to receive(:compress)
+                expect(Zstd).not_to receive(:decompress)
+              end
+            end
 
-        it "compresses large objects" do
-          s = "x" * 25000
-          expect(store.write("a", s, :compress => true)).to eq(true)
-          expect(store.read("a")).to eq(s)
-          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
-        end
+            it "can read/write compressed non-string objects" do
+              s = ["x"] * 10000
+              expect(store.write("a", s, compress: true, zstd: zstd)).to eq(true)
+              expect(store.read("a")).to eq(s)
+              expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
+            end
 
-        it "compresses objects larger than optional compress_limit" do
-          s = "compress me"
-          len = s.length
-          expect(store.write("a", s, :compress => true, :compress_limit => len-1)).to eq(true)
-          expect(store.read("a")).to eq(s)
-          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
-        end
+            it "compresses large objects" do
+              s = "x" * 25000
+              expect(store.write("a", s, compress: true, zstd: zstd)).to eq(true)
+              expect(store.read("a")).to eq(s)
+              expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
+            end
 
-        it "does not compress objects smaller than optional compress limit" do
-          s = "don't compress me"
-          len = s.length
-          expect(store.write("a", s, :compress => true, :compress_limit => len*2)).to eq(true)
-          expect(store.read("a")).to eq(s)
-          expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:normal)
-        end
+            it "compresses objects larger than optional compress_limit" do
+              s = "compress me"
+              len = s.length
+              expect(store.write("a", s, compress: true, zstd: zstd, compress_limit: len-1)).to eq(true)
+              expect(store.read("a")).to eq(s)
+              expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:compressed)
+            end
 
-        it "can read/write giant compressed objects" do
-          s = SecureRandom.hex(5_000_000)
-          expect(store.write("a", s, :compress => true)).to eq(true)
-          expect(store.store.read("a_#{version}_0").first).to eq(6)
-          expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:compressed)
-          expect(store.read("a").size).to eq(s.size)
+            it "does not compress objects smaller than optional compress limit" do
+              s = "don't compress me"
+              len = s.length
+              expect(store.write("a", s, compress: true, zstd: zstd, compress_limit: len*2)).to eq(true)
+              expect(store.read("a")).to eq(s)
+              expect(type(store.store.read("a_#{version}_0"), :single)).to eq(:normal)
+            end
+
+            it "can read/write giant compressed objects" do
+              s = SecureRandom.hex(5_000_000)
+              expect(store.write("a", s, compress: true, zstd: zstd)).to eq(true)
+              expect(store.store.read("a_#{version}_0").first).to be_between(5, 6)
+              expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:compressed)
+              expect(store.read("a").size).to eq(s.size)
+            end
+          end
         end
       end
 
