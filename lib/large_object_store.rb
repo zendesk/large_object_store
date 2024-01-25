@@ -38,7 +38,9 @@ module LargeObjectStore
 
       # calculate slice size; note that key length is a factor because
       # the key is stored on the same slab page as the value
-      slice_size = MAX_OBJECT_SIZE - ITEM_HEADER_SIZE - UUID_SIZE - key.bytesize
+      namespace = (store.respond_to?(:options) && store.options[:namespace]) || ""
+      namespace_length = namespace.empty? ? 0 : namespace.size + 1
+      slice_size = MAX_OBJECT_SIZE - ITEM_HEADER_SIZE - UUID_SIZE - key.bytesize - namespace_length
 
       # store number of pages
       pages = (value.size / slice_size.to_f).ceil
