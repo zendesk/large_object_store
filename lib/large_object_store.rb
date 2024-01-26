@@ -27,21 +27,18 @@ module LargeObjectStore
   class RailsWrapper
     attr_reader :store
 
-    def initialize(store, serializer: Marshal)
+    def initialize(store, serializer: Marshal, max_slice_size: MAX_OBJECT_SIZE)
       @store = store
       @serializer = serializer
+      @max_slice_size = [max_slice_size, MAX_OBJECT_SIZE].min
+      @namespace = (store.respond_to?(:options) && store.options[:namespace]) || ""
     end
 
     def write(key, value, **options)
       options = options.dup
       value = serialize(value, options)
 
-      # calculate slice size; note that key length is a factor because
-      # the key is stored on the same slab page as the value
-      namespace = (store.respond_to?(:options) && store.options[:namespace]) || ""
-      namespace_length = namespace.empty? ? 0 : namespace.size + 1
-      slice_size = MAX_OBJECT_SIZE - ITEM_HEADER_SIZE - UUID_SIZE - key.bytesize - namespace_length
-
+      slice_size = safe_slice_size(key)
       # store number of pages
       pages = (value.size / slice_size.to_f).ceil
 
@@ -109,6 +106,19 @@ module LargeObjectStore
     end
 
     private
+
+    # calculate slice size; note that key length is a factor because
+    # the key is stored on the same slab page as the value
+    def safe_slice_size(key)
+      namespace_length = @namespace.empty? ? 0 : @namespace.size + 1
+      overhead = ITEM_HEADER_SIZE + UUID_SIZE + key.bytesize + namespace_length
+      slice_size = @max_slice_size - overhead
+      if slice_size <= 0
+        MAX_OBJECT_SIZE - overhead
+      else
+        slice_size
+      end
+    end
 
     # convert a object to a string
     # modifies options

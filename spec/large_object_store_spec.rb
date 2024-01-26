@@ -22,6 +22,12 @@ describe LargeObjectStore do
     end
   end
 
+  def with_namespace(store, namespace)
+    store.instance_variable_set('@namespace', namespace)
+    yield
+    store.instance_variable_set('@namespace', '')
+  end
+
   stores = [ActiveSupport::Cache::MemoryStore.new]
 
   begin
@@ -35,6 +41,7 @@ describe LargeObjectStore do
     describe "with #{cache_instance.class} as the base store" do
       let(:cache) { cache_instance }
       let(:store) { LargeObjectStore.wrap(cache) }
+      let(:custom_slice_store) { LargeObjectStore.wrap(cache, max_slice_size: 100_000) }
       let(:version) { LargeObjectStore::CACHE_VERSION }
 
       before { cache.clear }
@@ -219,6 +226,26 @@ describe LargeObjectStore do
         key="a"*250
         expect(store.write(key, "a"*20_000_000)).to eq(true)
         expect(store.store.read("#{key}_#{version}_1").size).to eq(1048576 - 100 - 250)
+      end
+
+      it "adjusts slice size for namespace length" do
+        with_namespace(store, 'los') do
+          expect(store.write("a", "a"*20_000_000)).to eq(true)
+          expect(store.store.read("a_#{version}_1").size).to eq(1048576 - 100 - 4 - 1)
+
+          key="a"*250
+          expect(store.write(key, "a"*20_000_000)).to eq(true)
+          expect(store.store.read("#{key}_#{version}_1").size).to eq(1048576 - 100 - 250 - 4)
+        end
+      end
+
+      it "adjusts slice size for custom max_slice_size" do
+        expect(custom_slice_store.write("a", "a"*20_000_000)).to eq(true)
+        expect(custom_slice_store.store.read("a_#{version}_1").size).to eq(100_000 - 100 - 1)
+
+        key="a"*250
+        expect(custom_slice_store.write(key, "a"*20_000_000)).to eq(true)
+        expect(custom_slice_store.store.read("#{key}_#{version}_1").size).to eq(100_000 - 100 - 250)
       end
 
       it "uses necessary keys" do

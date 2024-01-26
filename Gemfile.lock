@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    large_object_store (1.6.1)
+    large_object_store (1.7.0)
       zstd-ruby (~> 1.5.5)
 
 GEM
