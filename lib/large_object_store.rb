@@ -71,7 +71,7 @@ module LargeObjectStore
         # read sliced data
         keys = (1..pages).map { |i| key(key, i) }
         # use values_at to enforce key order because read_multi doesn't guarantee a return order
-        slices = @store.read_multi(*keys).values_at(*keys)
+        slices = @store.read_multi(*keys, raw: true).values_at(*keys)
         return nil if slices.compact.size != pages
 
         slices = slices.map do |slice|
