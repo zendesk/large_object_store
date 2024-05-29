@@ -14,20 +14,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        activesupport:
+          - '6.1'
+          - '7.0'
+          - '7.1'
         ruby:
-          - '2.6'
-          - '2.7'
           - '3.0'
           - '3.1'
           - '3.2'
           - '3.3'
-    name: ${{ matrix.ruby }} rake
+    name: Ruby ${{ matrix.ruby }}, Rails ${{ matrix.activesupport }}
+    env:
+      BUNDLE_GEMFILE: gemfiles/activesupport${{ matrix.activesupport }}.gemfile
     steps:
-      - uses: zendesk/checkout@v3
-      - uses: zendesk/setup-ruby@v1
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+          bundler-cache: true
       - run: bundle exec rake MEMCACHED_PORT=${{ job.services.memcached.ports[11211] }}
 
   specs_successful:

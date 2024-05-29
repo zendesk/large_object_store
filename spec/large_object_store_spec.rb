@@ -1,7 +1,6 @@
 # encoding: utf-8
 require "spec_helper"
-require "active_support/cache"
-require "active_support/notifications"
+require "active_support"
 require "yaml"
 
 describe LargeObjectStore do
@@ -33,8 +32,9 @@ describe LargeObjectStore do
   begin
     require "active_support/cache/dalli_store"
     stores << ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
+    warn "Using ActiveSupport::Cache::DalliStore from dalli v2.x"
   rescue LoadError
-    # No DalliStore in Dalli v3+
+    stores << ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
   end
 
   stores.each do |cache_instance|
@@ -122,7 +122,7 @@ describe LargeObjectStore do
         size = 20_000_000 # more then that seems to break local memcached ...
         expect(store.write("a", "a"*size)).to eq(true)
         expect(store.read("a").size).to eq(size)
-        expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:normal)
+        expect(type(store.store.read("a_#{version}_1", raw:true), :multi)).to eq(:normal)
       end
 
       describe "raw" do
@@ -140,7 +140,7 @@ describe LargeObjectStore do
         it "can read and write large objects with raw" do
           expect(store.write("a", "a"*10_000_000, raw: true)).to eq(true)
           expect(store.read("a").size).to eq(10_000_000)
-          expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:raw)
+          expect(type(store.store.read("a_#{version}_1", raw:true), :multi)).to eq(:raw)
         end
 
         it "can read and write compressed raw" do
@@ -212,7 +212,7 @@ describe LargeObjectStore do
               s = SecureRandom.hex(5_000_000)
               expect(store.write("a", s, compress: true, zstd: zstd)).to eq(true)
               expect(store.store.read("a_#{version}_0").first).to be_between(5, 6)
-              expect(type(store.store.read("a_#{version}_1"), :multi)).to eq(:compressed)
+              expect(type(store.store.read("a_#{version}_1", raw:true), :multi)).to eq(:compressed)
               expect(store.read("a").size).to eq(s.size)
             end
           end
@@ -221,37 +221,37 @@ describe LargeObjectStore do
 
       it "adjusts slice size for key length" do
         expect(store.write("a", "a"*20_000_000)).to eq(true)
-        expect(store.store.read("a_#{version}_1").size).to eq(1048576 - 100 - 1)
+        expect(store.store.read("a_#{version}_1", raw:true).size).to eq(1048576 - 100 - 1)
 
         key="a"*250
         expect(store.write(key, "a"*20_000_000)).to eq(true)
-        expect(store.store.read("#{key}_#{version}_1").size).to eq(1048576 - 100 - 250)
+        expect(store.store.read("#{key}_#{version}_1", raw: true).size).to eq(1048576 - 100 - 250)
       end
 
       it "adjusts slice size for namespace length" do
         with_namespace(store, 'los') do
           expect(store.write("a", "a"*20_000_000)).to eq(true)
-          expect(store.store.read("a_#{version}_1").size).to eq(1048576 - 100 - 4 - 1)
+          expect(store.store.read("a_#{version}_1", raw:true).size).to eq(1048576 - 100 - 4 - 1)
 
           key="a"*250
           expect(store.write(key, "a"*20_000_000)).to eq(true)
-          expect(store.store.read("#{key}_#{version}_1").size).to eq(1048576 - 100 - 250 - 4)
+          expect(store.store.read("#{key}_#{version}_1", raw:true).size).to eq(1048576 - 100 - 250 - 4)
         end
       end
 
       it "adjusts slice size for custom max_slice_size" do
-        expect(custom_slice_store.write("a", "a"*20_000_000)).to eq(true)
-        expect(custom_slice_store.store.read("a_#{version}_1").size).to eq(100_000 - 100 - 1)
+        expect(custom_slice_store.write("a", "a"*200_000)).to eq(true)
+        expect(custom_slice_store.store.read("a_#{version}_1", raw:true).size).to eq(100_000 - 100 - 1)
 
         key="a"*250
-        expect(custom_slice_store.write(key, "a"*20_000_000)).to eq(true)
-        expect(custom_slice_store.store.read("#{key}_#{version}_1").size).to eq(100_000 - 100 - 250)
+        expect(custom_slice_store.write(key, "a"*200_000)).to eq(true)
+        expect(custom_slice_store.store.read("#{key}_#{version}_1", raw:true).size).to eq(100_000 - 100 - 250)
       end
 
       it "uses necessary keys" do
         store.write("a", "a"*5_000_000)
-        expect(["a_#{version}_0", "a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5", "a_#{version}_6"].map do |k|
-          store.store.read(k).class
+        expect(["a_#{version}_0", "a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5", "a_#{version}_6"].map.with_index do |k,i|
+          store.store.read(k, raw: !i.zero?).class
         end).to eq([Array, String, String, String, String, String, NilClass])
       end
 
@@ -273,7 +273,7 @@ describe LargeObjectStore do
         store.write("a", "c"*5_000_000) # don't use 'a' because it is a valid flag option
         keys = ["a_#{version}_1", "a_#{version}_2", "a_#{version}_3", "a_#{version}_4", "a_#{version}_5"]
         out_of_order_hash = keys.reverse.each_with_object({}) do |k, h|
-          h[k] = store.store.read(k)
+          h[k] = store.store.read(k, raw: true)
         end
         expect(store.store).to receive(:read_multi).and_return out_of_order_hash
         expect(store.read("a").size).to eq(5_000_000)
