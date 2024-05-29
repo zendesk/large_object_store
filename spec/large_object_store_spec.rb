@@ -1,7 +1,6 @@
 # encoding: utf-8
 require "spec_helper"
-require "active_support/cache"
-require "active_support/notifications"
+require "active_support"
 require "yaml"
 
 describe LargeObjectStore do
@@ -33,8 +32,9 @@ describe LargeObjectStore do
   begin
     require "active_support/cache/dalli_store"
     stores << ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
+    warn "Using ActiveSupport::Cache::DalliStore from dalli v2.x"
   rescue LoadError
-    # No DalliStore in Dalli v3+
+    stores << ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
   end
 
   stores.each do |cache_instance|
