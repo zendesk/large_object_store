@@ -9,5 +9,5 @@ Gem::Specification.new name, LargeObjectStore::VERSION do |s|
   s.files = `git ls-files lib Readme.md`.split("\n")
   s.license = "MIT"
   s.required_ruby_version = '>= 3.0'
-  s.add_runtime_dependency('zstd-ruby', '~> 1.5.5')
+  s.add_runtime_dependency('zstd-ruby', '~> 1.5.6', '>= 1.5.6.2')
 end
