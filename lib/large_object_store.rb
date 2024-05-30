@@ -9,12 +9,12 @@ module LargeObjectStore
   CACHE_VERSION = 4
   MAX_OBJECT_SIZE = 1024**2
   ITEM_HEADER_SIZE = 100
-  DEFAULT_COMPRESS_LIMIT = 16*1024
+  DEFAULT_COMPRESS_LIMIT = 16 * 1024
   NORMAL = 0
   COMPRESSED = 1
   RAW = 2
   FLAG_RADIX = 32 # we can store 32 different states
-  ZSTD_MAGIC = "\x28\xB5\x2F\xFD".force_encoding('ASCII-8BIT')
+  ZSTD_MAGIC = "\x28\xB5\x2F\xFD".force_encoding("ASCII-8BIT")
   ZSTD_COMPRESS_LEVEL = 3 # Default level recommended by zstd authors
 
   def self.wrap(*args)

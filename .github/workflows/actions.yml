@@ -5,6 +5,17 @@ on:
   pull_request:
     branches: [master]
 jobs:
+  lint:
+    name: Lint Ruby
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ruby
+          bundler-cache: true
+      - run: bundle exec rake standard
+
   specs:
     runs-on: ubuntu-latest
     services:
@@ -32,7 +43,9 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - run: bundle exec rake MEMCACHED_PORT=${{ job.services.memcached.ports[11211] }}
+      - run: bundle exec rake spec
+        env:
+          MEMCACHED_PORT: ${{ job.services.memcached.ports[11211] }}
 
   specs_successful:
     name: Specs passing?
