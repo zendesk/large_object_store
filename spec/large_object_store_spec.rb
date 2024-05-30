@@ -34,6 +34,7 @@ describe LargeObjectStore do
     stores << ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
     warn "Using ActiveSupport::Cache::DalliStore from dalli v2.x"
   rescue LoadError
+    ActiveSupport.cache_format_version = "#{ActiveSupport::VERSION::MAJOR}.#{ActiveSupport::VERSION::MINOR}".to_f if ActiveSupport.respond_to?(:cache_format_version=)
     stores << ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
   end
 
