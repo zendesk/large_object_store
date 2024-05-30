@@ -142,7 +142,7 @@ module LargeObjectStore
 
     def compress(value, options)
       if options[:zstd]
-        Zstd.compress(value, ZSTD_COMPRESS_LEVEL)
+        Zstd.compress(value, level: ZSTD_COMPRESS_LEVEL)
       else
         Zlib::Deflate.deflate(value)
       end
