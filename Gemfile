@@ -1,9 +1,1 @@
-source "https://rubygems.org"
-gemspec
-
-gem "bump"
-gem "rake"
-gem "rspec", "~> 3"
-gem "standard"
-gem "dalli"
-gem "activesupport", type: :development
+eval_gemfile("gemfiles/activesupport7.1.gemfile")
