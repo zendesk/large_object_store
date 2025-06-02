@@ -2,6 +2,8 @@ require "spec_helper"
 require "active_support"
 require "yaml"
 
+ActiveSupport.cache_format_version = 7.1
+
 describe LargeObjectStore do
   # flag is in first position for single page values and after the uuid for multi page values
   def type(data, kind)
@@ -26,18 +28,10 @@ describe LargeObjectStore do
     store.instance_variable_set(:@namespace, "")
   end
 
-  stores = [ActiveSupport::Cache::MemoryStore.new]
-
-  begin
-    require "active_support/cache/dalli_store"
-    stores << ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
-    warn "Using ActiveSupport::Cache::DalliStore from dalli v2.x"
-  rescue LoadError
-    ActiveSupport.cache_format_version = 7.1
-    stores << ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
-  end
-
-  stores.each do |cache_instance|
+  [
+    ActiveSupport::Cache::MemoryStore.new,
+    ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
+  ].each do |cache_instance|
     describe "with #{cache_instance.class} as the base store" do
       let(:cache) { cache_instance }
       let(:store) { LargeObjectStore.wrap(cache) }
