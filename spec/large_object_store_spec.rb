@@ -29,11 +29,18 @@ describe LargeObjectStore do
   end
 
   [
-    ActiveSupport::Cache::MemoryStore.new,
-    ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
-  ].each do |cache_instance|
-    describe "with #{cache_instance.class} as the base store" do
-      let(:cache) { cache_instance }
+    ActiveSupport::Cache::MemoryStore,
+    ActiveSupport::Cache::MemCacheStore
+  ].each do |cache_class|
+    describe "with #{cache_class.name} as the base store" do
+      let(:cache) do
+        if cache_class == ActiveSupport::Cache::MemoryStore
+          cache_class.new
+        elsif cache_class == ActiveSupport::Cache::MemCacheStore
+          memcached_port = RSpec.configuration.memcached_container.mapped_port(11211)
+          cache_class.new("127.0.0.1:#{memcached_port}")
+        end
+      end
       let(:store) { LargeObjectStore.wrap(cache) }
       let(:custom_slice_store) { LargeObjectStore.wrap(cache, max_slice_size: 100_000) }
       let(:version) { LargeObjectStore::CACHE_VERSION }
