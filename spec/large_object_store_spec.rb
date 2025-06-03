@@ -33,7 +33,7 @@ describe LargeObjectStore do
     stores << ActiveSupport::Cache::DalliStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
     warn "Using ActiveSupport::Cache::DalliStore from dalli v2.x"
   rescue LoadError
-    ActiveSupport.cache_format_version = "#{ActiveSupport::VERSION::MAJOR}.#{ActiveSupport::VERSION::MINOR}".to_f if ActiveSupport.respond_to?(:cache_format_version=)
+    ActiveSupport.cache_format_version = 7.1
     stores << ActiveSupport::Cache::MemCacheStore.new("localhost:#{ENV["MEMCACHED_PORT"] || "11211"}")
   end
 
@@ -79,11 +79,7 @@ describe LargeObjectStore do
 
       it "returns false when underlying write fails" do
         expect(store.store).not_to receive(:write).with(anything, anything, raw: true)
-        if RUBY_VERSION < "3"
-          expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything], {}).exactly(1).times.and_return(false)
-        else
-          expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything]).exactly(1).times.and_return(false)
-        end
+        expect(store.store).to receive(:write).with("a_#{version}_0", [2, anything]).exactly(1).times.and_return(false)
         expect(store.write("a", "a" * 1_200_000)).to eq(false)
       end
 
