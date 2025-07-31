@@ -44,7 +44,10 @@ describe LargeObjectStore do
       let(:custom_slice_store) { LargeObjectStore.wrap(cache, max_slice_size: 100_000) }
       let(:version) { LargeObjectStore::CACHE_VERSION }
 
-      before { cache.clear }
+      before do
+        cache.clear
+        puts "limit: #{cache.stats.dig("localhost:#{ENV.fetch("MEMCACHED_PORT", "11211")}", "limit_maxbytes")}" if cache.respond_to?(:stats)
+      end
 
       it "has a VERSION" do
         expect(LargeObjectStore::VERSION).to match(/^[\.\da-z]+$/)
@@ -236,12 +239,12 @@ describe LargeObjectStore do
       end
 
       it "adjusts slice size for custom max_slice_size" do
-        expect(custom_slice_store.write("a", "a" * 200_000)).to eq(true)
-        expect(custom_slice_store.store.read("a_#{version}_1", raw: true).size).to eq(100_000 - 100 - 1)
+        expect(custom_slice_store.write("a", "a"*20_000_000)).to eq(true)
+        expect(custom_slice_store.store.read("a_#{version}_1", raw:true).size).to eq(100_000 - 100 - 1)
 
-        key = "a" * 250
-        expect(custom_slice_store.write(key, "a" * 200_000)).to eq(true)
-        expect(custom_slice_store.store.read("#{key}_#{version}_1", raw: true).size).to eq(100_000 - 100 - 250)
+        key="a"*250
+        expect(custom_slice_store.write(key, "a"*20_000_000)).to eq(true)
+        expect(custom_slice_store.store.read("#{key}_#{version}_1", raw:true).size).to eq(100_000 - 100 - 250)
       end
 
       it "uses necessary keys" do
