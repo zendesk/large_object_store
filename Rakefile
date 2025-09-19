@@ -2,8 +2,10 @@ require "bundler/setup"
 require "bundler/gem_tasks"
 require "bump/tasks"
 require "rspec/core/rake_task"
-require "standard/rake"
+require "rubocop/rake_task"
 
 RSpec::Core::RakeTask.new(:spec)
 
-task default: [:spec, :standard]
+RuboCop::RakeTask.new
+
+task default: [:spec, :rubocop]
