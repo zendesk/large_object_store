@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 name = "large_object_store"
 require "./lib/#{name}/version"
 

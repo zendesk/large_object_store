@@ -13,3 +13,5 @@ inherit_gem:
 
 AllCops:
   SuggestExtensions: false
+
+Style/FrozenStringLiteralComment: {Enabled: true}

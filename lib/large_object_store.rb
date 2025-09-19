@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "large_object_store/version"
 require "zlib"
 require "zstd-ruby"
@@ -14,7 +16,7 @@ module LargeObjectStore
   COMPRESSED = 1
   RAW = 2
   FLAG_RADIX = 32 # we can store 32 different states
-  ZSTD_MAGIC = "\x28\xB5\x2F\xFD".force_encoding("ASCII-8BIT")
+  ZSTD_MAGIC = (+"\x28\xB5\x2F\xFD").force_encoding("ASCII-8BIT")
   ZSTD_COMPRESS_LEVEL = 3 # Default level recommended by zstd authors
 
   def self.wrap(*args)
@@ -137,7 +139,7 @@ module LargeObjectStore
         value = compress(value, options)
       end
 
-      value.prepend(flag.to_s(FLAG_RADIX))
+      "#{flag.to_s(FLAG_RADIX)}#{value}"
     end
 
     def compress(value, options)
