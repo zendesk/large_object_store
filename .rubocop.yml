@@ -1,0 +1,17 @@
+require:
+  - standard
+
+plugins:
+  - standard-custom
+  - standard-performance
+  - rubocop-performance
+
+inherit_gem:
+  standard: config/base.yml
+  standard-custom: config/base.yml
+  standard-performance: config/base.yml
+
+AllCops:
+  SuggestExtensions: false
+
+Style/FrozenStringLiteralComment: {Enabled: true}
